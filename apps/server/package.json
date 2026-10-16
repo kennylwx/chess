@@ -1,0 +1,11 @@
+{
+  "name": "@check/server",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "uv run uvicorn check_server.main:app --reload --port 8000",
+    "build": "uv run python -m compileall -q check_server",
+    "typecheck": "uv run python -m compileall -q check_server",
+    "test": "uv run pytest -q"
+  }
+}

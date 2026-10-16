@@ -1,0 +1,4 @@
+import { test, expect } from '@playwright/test';
+test.beforeEach(async({page})=>{await page.route('**/api/engine',route=>route.fulfill({json:{move:'e7e5',fen:'',explanation:'Stockfish'}}));await page.goto('/');});
+test('runs notation through the terminal and receives a server engine move',async({page})=>{await page.getByPlaceholder('move the queen up by 1').fill('e2e4');await page.getByRole('button',{name:'ENTER'}).click();await expect(page.locator('#output')).toContainText('You played e4');await expect(page.locator('#output')).toContainText('Stockfish played e5');});
+test('supports terminal commands without calling the API',async({page})=>{const input=page.getByPlaceholder('move the queen up by 1');await input.fill('help');await input.press('Enter');await expect(page.locator('#output')).toContainText('COMMANDS');await input.fill('fen');await input.press('Enter');await expect(page.locator('#output')).toContainText('rnbqkbnr/pppppppp');});

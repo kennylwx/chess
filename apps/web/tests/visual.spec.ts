@@ -1,0 +1,2 @@
+import { test, expect } from '@playwright/test';
+test('captures a review screenshot after visual assertions',async({page})=>{await page.goto('/');const terminal=page.locator('.terminal');await expect(terminal).toBeVisible();await expect(terminal).toHaveCSS('display','grid');await expect(page.locator('#output')).toContainText('Connected to Check Cloud');await expect(page.locator('#command')).toBeFocused();await page.screenshot({path:'screenshots/check-terminal.png',fullPage:true});});
