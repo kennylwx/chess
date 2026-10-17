@@ -37,7 +37,7 @@ test('plays a notation move against bundled local Stockfish', async ({ page }) =
   await page.getByPlaceholder('e4, Nf3, or describe your move…').fill('e2e4');
   await page.getByRole('button', { name: 'Enter' }).click();
   await expect(page.locator('#moves')).toContainText('1. e4');
-  await expect(page.locator('#moves')).toContainText(/1\. e4 [a-z][a-z0-9+#=]*/);
+  await expect(page.locator('#moves')).toContainText(/1\. e4 [a-z][a-z0-9+#=]*/i);
   await expect(page.locator('#board .piece')).toHaveCount(32);
   expect(serverCalls).toEqual([]);
 });

@@ -216,6 +216,7 @@ async function playGame(config: GameConfig, options: { graphics: GraphicsMode; d
   const useGraphics = supportsGraphics(options.graphics);
   let stopped = false;
   let asking = false;
+  let redrawInput: (() => void) | undefined;
   let last: number[] | null = null;
   let undoRequested = false;
   let returnToMenu = false;
@@ -284,11 +285,58 @@ async function playGame(config: GameConfig, options: { graphics: GraphicsMode; d
     } else { undoRequested = true; search?.abort(); }
   };
   const stop = (): void => { stopped = true; abort.abort(); search?.abort(); if (backTimer) clearTimeout(backTimer); if (quitTimer) clearTimeout(quitTimer); };
-  const resize = (): void => { if (!stopped) { draw(); if (asking) rl.prompt(true); } };
-  const question = async (prompt: string): Promise<string> => {
+  const resize = (): void => { if (!stopped) { draw(); redrawInput?.(); } };
+  const question = async (placeholder: string): Promise<string> => {
     asking = true;
-    try { return await rl.question(`${promptColor}${prompt}${reset}`, { signal: abort.signal }); }
-    finally { asking = false; }
+    if (!screen.active) {
+      try { return await rl.question(`${promptColor}${placeholder} › ${reset}`, { signal: abort.signal }); }
+      finally { asking = false; }
+    }
+    const stream = stdin as typeof stdin & { setRawMode?: (mode: boolean) => void };
+    const previousRaw = stream.isRaw;
+    const previous = stdin.listeners('keypress') as Array<(text: string, key: Key) => void>;
+    previous.forEach(listener => stdin.removeListener('keypress', listener));
+    stream.setRawMode?.(true);
+    return new Promise(resolve => {
+      let value = '';
+      let done = false;
+      let shortcutTimer: ReturnType<typeof setTimeout> | undefined;
+      const redraw = (): void => screen.input(value, placeholder);
+      const finish = (answer: string): void => {
+        if (done) return;
+        done = true;
+        if (shortcutTimer) clearTimeout(shortcutTimer);
+        stdin.removeListener('keypress', onKey);
+        abort.signal.removeEventListener('abort', onAbort);
+        previous.forEach(listener => stdin.on('keypress', listener));
+        stream.setRawMode?.(previousRaw);
+        redrawInput = undefined;
+        asking = false;
+        screen.input('', placeholder);
+        resolve(answer);
+      };
+      const onAbort = (): void => finish('');
+      const onKey = (text: string, key: Key): void => {
+        if (shortcutTimer) { clearTimeout(shortcutTimer); shortcutTimer = undefined; }
+        if (key?.name === 'escape') { returnToMenuRequested = true; abort.abort(); search?.abort(); finish(''); return; }
+        if (key?.ctrl && key.name === 'c') { stop(); finish(''); return; }
+        if (key?.ctrl && key.name === 'u') { finish('undo'); return; }
+        if (key?.name === 'return' || key?.name === 'enter') { finish(value); return; }
+        if (key?.name === 'backspace') value = [...value].slice(0, -1).join('');
+        else if (!key?.ctrl && !key?.meta && text && !/[\x00-\x1f\x7f]/.test(text)) value += text;
+        redraw();
+        if (value.toLowerCase() === 'b' || value.toLowerCase() === 'q') {
+          shortcutTimer = setTimeout(() => {
+            if (value.toLowerCase() === 'b') { returnToMenuRequested = true; abort.abort(); search?.abort(); finish(''); }
+            else { stop(); finish(''); }
+          }, 300);
+        }
+      };
+      redrawInput = redraw;
+      stdin.on('keypress', onKey);
+      abort.signal.addEventListener('abort', onAbort, { once: true });
+      redraw();
+    });
   };
   stdin.on('keypress', shortcut);
   rl.on('SIGINT', stop);
@@ -307,7 +355,7 @@ async function playGame(config: GameConfig, options: { graphics: GraphicsMode; d
         persist();
         draw();
         if (screen.active) {
-          const command = await question('B menu · Q quit · Ctrl+U undo › ');
+          const command = await question('B menu · Q quit · Ctrl+U undo');
           if (command.trim().toLowerCase() === 'undo') { takeBack(); continue; }
           if (/^(q|quit|exit)$/.test(command.trim().toLowerCase())) { stop(); break; }
           break;
@@ -337,7 +385,7 @@ async function playGame(config: GameConfig, options: { graphics: GraphicsMode; d
 
       draw();
       let raw: string;
-      try { raw = await question('Move > '); }
+      try { raw = await question('free text'); }
       catch (error) { if (returnToMenuRequested) break; throw error; }
       let intent;
       try { intent = await modelInput(raw, chess, server); }

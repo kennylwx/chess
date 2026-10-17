@@ -35,6 +35,20 @@ test('keeps algebraic move history in the shaded header above the board', () => 
   assert.match(output, /48;2;35;49;39m/);
 });
 
+test('keeps a distinct input field on the bottom row and replaces its placeholder', () => {
+  let output = '';
+  const screen = new GameScreen(true, { columns: 80, rows: 30, write: text => { output += text; } });
+  screen.draw('Chess', 'board frame', 'Your move');
+  assert.match(output, /\x1b\[29;1H/);
+  assert.match(output, /\x1b\[30;1H/);
+  assert.match(output, /48;2;12;42;34m/);
+  assert.match(output, /❯  .*free text/);
+  output = '';
+  screen.input('e2e4');
+  assert.match(output, /❯  .*e2e4/);
+  assert.ok(!output.includes('free text'));
+});
+
 test('redirected output remains plain text', () => {
   let output = '';
   const screen = new GameScreen(false, { write: text => { output += text; } });

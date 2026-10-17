@@ -2,6 +2,7 @@ import { stdout } from 'node:process';
 
 interface Output {
   columns?: number;
+  rows?: number;
   write(text: string): unknown;
 }
 
@@ -30,8 +31,26 @@ export class GameScreen {
     const controls = ' Ctrl+U Undo  B Menu  Q Quit';
     const statusWidth = Math.max(0, width - controls.length);
     const footer = `\x1b[48;2;35;49;39m\x1b[38;2;210;225;202m${fit(status).slice(0, statusWidth).padEnd(statusWidth)}${controls.slice(-Math.min(width, controls.length))}\x1b[0m`;
+    const bottom = Math.max(4, this.output.rows || 40);
     this.output.write('\x1b[?2026h\x1b[H\x1b[2J' +
-      `${title}\r\n${history}\r\n${board}\r\n${footer}\r\n` + '\x1b[?2026l');
+      `${title}\r\n${history}\r\n${board}\x1b[${bottom - 1};1H${footer}` +
+      this.inputFrame('', 'free text') + '\x1b[?2026l');
+  }
+
+  input(value: string, placeholder = 'free text'): void {
+    if (this.active) this.output.write(this.inputFrame(value, placeholder));
+  }
+
+  private inputFrame(value: string, placeholder: string): string {
+    const width = Math.max(1, (this.output.columns || 80) - 1);
+    const bottom = Math.max(4, this.output.rows || 40);
+    const visible = [...value].slice(-Math.max(0, width - 4)).join('');
+    const content = value ? visible : placeholder;
+    const foreground = value ? '\x1b[38;2;235;248;226m' : '\x1b[38;2;139;168;144m';
+    const row = `\x1b[48;2;12;42;34m\x1b[38;2;190;221;173m❯  ${foreground}${content}`;
+    const used = 3 + [...content].length;
+    const cursor = Math.min(width, 4 + [...visible].length);
+    return `\x1b[${bottom};1H${row}${' '.repeat(Math.max(0, width - used))}\x1b[0m\x1b[${bottom};${cursor}H`;
   }
 
   close(): void {
