@@ -8,6 +8,7 @@
     "strict": true,
     "declaration": true,
     "sourceMap": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
     "types": [
       "node"

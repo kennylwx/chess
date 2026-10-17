@@ -44,3 +44,10 @@ test('fixed board updates do not reserve new lines or scroll the terminal', () =
   assert.ok(!output.includes('\n'));
   assert.match(output, /C=1,q=2/);
 });
+
+test('fits the image into a square terminal footprint', () => {
+  const output = renderGraphics(new Chess(), 'w', null);
+  const placement = output.match(/c=(\d+),r=(\d+)/);
+  assert.ok(placement);
+  assert.equal(Number(placement[1]), Number(placement[2]) * 2);
+});

@@ -1,9 +1,9 @@
-import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import type { Chess } from '@chess/chess';
+import piecesData from '@chess/chess/pieces' with { type: 'json' };
 
 const require = createRequire(import.meta.url);
-let pieces: Record<string, string> | undefined;
+const pieces = piecesData as Record<string, string>;
 const IMAGE_ID = 73191;
 export type GraphicsMode = 'auto' | 'kitty' | 'text';
 
@@ -15,7 +15,6 @@ export function supportsGraphics(mode: GraphicsMode, tty = Boolean(process.stdou
 }
 
 export function boardSvg(chess: Chess, perspective: 'w' | 'b', last: number[] | null): string {
-  pieces ??= JSON.parse(readFileSync(require.resolve('@chess/chess/pieces'), 'utf8'));
   const order = perspective === 'w' ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
   const svg = ['<svg xmlns="http://www.w3.org/2000/svg" width="768" height="768" viewBox="0 0 768 768">',
     '<rect width="768" height="768" rx="12" fill="#14291f"/>'];
@@ -26,7 +25,7 @@ export function boardSvg(chess: Chess, perspective: 'w' | 'b', last: number[] | 
       const fill = last?.includes(index) ? '#b4cf68' : (rank + file) % 2 ? '#64916d' : '#d5e5cb';
       svg.push(`<rect x="${left}" y="${top}" width="90" height="90" fill="${fill}"/>`);
       const piece = chess.board[index];
-      if (piece) svg.push(`<g transform="translate(${left} ${top}) scale(2)">${pieces![piece]}</g>`);
+      if (piece) svg.push(`<g transform="translate(${left} ${top}) scale(2)">${pieces[piece]}</g>`);
     }
     svg.push(`<text x="12" y="${24 + y * 90 + 50}" text-anchor="middle" font-size="16" font-family="sans-serif" fill="#d5e5cb">${8 - rank}</text>`);
   }
@@ -43,8 +42,12 @@ export function boardPng(chess: Chess, perspective: 'w' | 'b', last: number[] | 
 }
 
 export function renderGraphics(chess: Chess, perspective: 'w' | 'b', last: number[] | null, fixed = false): string {
-  const rows = Math.max(1, Math.min(32, (process.stdout.rows || 40) - 7));
-  const columns = Math.max(1, Math.min(64, (process.stdout.columns || 80) - 2));
+  // A typical terminal cell is about twice as tall as it is wide. Reserve a
+  // 2:1 column/row box so the square PNG and its pieces keep their proportions.
+  const availableRows = Math.max(1, (process.stdout.rows || 40) - 7);
+  const availableColumns = Math.max(2, (process.stdout.columns || 80) - 2);
+  const rows = Math.max(1, Math.min(32, availableRows, Math.floor(availableColumns / 2)));
+  const columns = rows * 2;
   const data = boardPng(chess, perspective, last).toString('base64');
   // Reserve room first: images anchored near the bottom must not cover the prompt.
   let output = `\x1b_Ga=d,d=I,i=${IMAGE_ID},q=2;\x1b\\`;

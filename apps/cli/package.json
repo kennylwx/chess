@@ -1,24 +1,43 @@
 {
   "name": "@chess/cli",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "files": [
+    "bin/",
+    "dist/cli.bundle.js",
+    "dist/cli.bundle.js.map",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kennylwx/chess.git",
+    "directory": "apps/cli"
+  },
+  "license": "MIT",
   "bin": {
     "chess": "./bin/chess.js"
   },
   "dependencies": {
-    "@chess/chess": "workspace:*",
     "@resvg/resvg-js": "^2.6.2",
     "stockfish": "19.0.1"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && esbuild src/cli.ts --bundle --platform=node --format=esm --target=node22 --external:stockfish --external:@resvg/resvg-js --sourcemap --outfile=dist/cli.bundle.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "tsc -w",
     "test": "node --test",
     "start": "node bin/chess.js"
   },
   "devDependencies": {
-    "@types/node": "^22.20.5"
+    "@chess/chess": "workspace:*",
+    "@types/node": "^22.20.5",
+    "esbuild": "^0.28.2"
   }
 }

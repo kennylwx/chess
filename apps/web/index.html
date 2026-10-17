@@ -1,14 +1,19 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Chess — your move</title><link rel="stylesheet" href="/src/style.css"></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#102019"><title>Chess — play Stockfish</title><link rel="icon" type="image/svg+xml" href="/pawn.svg"><link rel="stylesheet" href="/src/style.css"></head>
 <body>
 <main class="terminal">
-  <header><a class="brand" href="./">CHESS<span> / your move.</span></a><span class="engine-label"><i></i> STOCKFISH 19</span></header>
-  <section class="toolbar" aria-label="Game settings">
-    <label>PLAY AS <select id="side"><option value="w">White</option><option value="b">Black</option></select></label>
-    <label>ELO <input id="elo" type="number" min="1320" max="3190" step="1" value="1500" required></label>
-    <div class="actions"><button id="undo" type="button" title="Undo your last turn (Ctrl+U)">↶ Undo <kbd>Ctrl U</kbd></button><button id="new" type="button">New game</button></div>
+  <header><div class="brand"><img src="/pawn.svg" alt="" width="30" height="30"><span>CHESS</span></div><span class="engine-label"><i></i> LOCAL STOCKFISH 19 <span class="terminal-id">/ TTY 01</span></span></header>
+  <section id="menu" class="menu" aria-label="Chess menu">
+    <div id="menu-home" class="menu-page"><p class="eyebrow">CHESS / LOCAL STOCKFISH</p><h1>Your move<span class="cursor">_</span></h1><p>Choose an option to begin.</p><div class="menu-actions"><button id="play" type="button"><span class="option-number">1</span>Play</button><button id="load" type="button"><span class="option-number">2</span>Load a saved game</button></div></div>
+    <div id="menu-setup" class="menu-page" hidden><button class="back" data-back="home" type="button">← B Back</button><p class="eyebrow">NEW GAME / STOCKFISH STRENGTH</p><h1>Choose a level<span class="cursor">_</span></h1><div id="strengths" class="strengths" role="group" aria-label="Stockfish strength"></div><label class="custom-elo" id="custom-elo-label" hidden>Custom ELO <input id="custom-elo" type="number" min="1320" max="3190" value="1500"></label><p class="range">Available range: 1320–3190 ELO</p><button id="next" class="primary" type="button">Continue ↵</button></div>
+    <div id="menu-side" class="menu-page" hidden><button class="back" data-back="setup" type="button">← B Back</button><p class="eyebrow">NEW GAME / CHOOSE SIDE</p><h1>Choose your side<span class="cursor">_</span></h1><div id="sides" class="choice-row" role="group" aria-label="Choose side"><button type="button" data-side="w"><span class="option-number">1</span>White</button><button type="button" data-side="b"><span class="option-number">2</span>Black</button><button type="button" data-side="random"><span class="option-number">3</span>Random</button></div><button id="start" class="primary" type="button">Start game ↵</button></div>
+    <div id="menu-load" class="menu-page" hidden><button class="back" data-back="home" type="button">← B Back</button><p class="eyebrow">LOAD A SAVED GAME</p><h1>Saved games<span class="cursor">_</span></h1><div id="saved-games"></div></div>
+    <div id="menu-exit" class="menu-page" hidden><p class="eyebrow">SESSION ENDED</p><h1>Good game<span class="cursor">_</span></h1><p>Press Enter to return to the menu.</p><button id="reopen" type="button">↵ Reopen chess</button></div>
+    <div class="menu-prompt"><span>❯</span><span id="menu-hint">Press 1 or 2 · B back · Q quit</span></div>
   </section>
+  <div id="game" hidden>
+  <div class="game-bar"><button id="menu-button" type="button">← B Menu</button><span id="game-label"></span><button id="undo" type="button" title="Undo your last turn (Ctrl+U)">↶ Ctrl+U Undo</button></div>
   <section id="screen" aria-label="Chess game">
     <div class="board-heading"><span id="turn">WHITE TO MOVE</span><span id="player">YOU ARE WHITE</span></div>
     <div id="board" aria-label="Chessboard"></div>
@@ -20,7 +25,8 @@
     <button id="retry" type="button" hidden>Retry Stockfish</button>
   </section>
   <form id="command-form"><label for="command" class="prompt">❯<span class="sr-only">Your move or command</span></label><input id="command" autofocus autocomplete="off" spellcheck="false" placeholder="e4, Nf3, or describe your move…"><button id="submit" type="submit">Enter ↵</button></form>
-  <footer><span>Exact notation. Your decisions.</span><button id="help" type="button">Commands ?</button></footer>
+  <footer><span>e4 · e2e4 · describe a move</span><button id="help" type="button">help / fen / undo / B / Q</button></footer>
+  </div>
 </main>
 <script type="module" src="/src/main.ts"></script>
 </body></html>

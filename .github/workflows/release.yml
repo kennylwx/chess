@@ -1,0 +1,55 @@
+name: publish-cli
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build --filter=@chess/cli...
+      - run: pnpm --filter @chess/cli test
+      - name: Check release version
+        run: |
+          PACKAGE_VERSION="$(node -p "require('./apps/cli/package.json').version")"
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          test "$PACKAGE_VERSION" = "$TAG_VERSION"
+      - name: Stage the publishable package
+        run: |
+          node scripts/prepare-cli-package.mjs "$RUNNER_TEMP/chess-package"
+          mkdir -p "$RUNNER_TEMP/chess-pack"
+          npm pack --json --pack-destination "$RUNNER_TEMP/chess-pack" "$RUNNER_TEMP/chess-package"
+          VERSION="${GITHUB_REF_NAME#v}"
+          npm install --prefix "$RUNNER_TEMP/chess-cli-install" --no-audit --no-fund "$RUNNER_TEMP/chess-pack/chess-cli-${VERSION}.tgz"
+          node scripts/smoke-installed-cli.mjs "$RUNNER_TEMP/chess-cli-install/node_modules/.bin/chess"
+      - name: Publish to npm
+        run: npm publish "$RUNNER_TEMP/chess-package" --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Prepare Homebrew formula
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          TARBALL="$(npm view "@chess/cli@${VERSION}" dist.tarball)"
+          curl --fail --location "$TARBALL" --output "$RUNNER_TEMP/chess-cli.tgz"
+          SHA256="$(shasum -a 256 "$RUNNER_TEMP/chess-cli.tgz" | cut -d ' ' -f 1)"
+          node scripts/generate-homebrew-formula.mjs "$VERSION" "$TARBALL" "$SHA256" "$RUNNER_TEMP/chess-cli.rb"
+      - name: Create release with Homebrew formula
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: ${{ runner.temp }}/chess-cli.rb
