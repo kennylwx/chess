@@ -89,3 +89,17 @@ Type a suggestion to play it; suggestions never move a piece automatically.
 - `new` — start a new game (browser only).
 - `fen <position>` — load a FEN position (terminal only).
 - `quit` — exit (terminal only).
+
+## Releasing the CLI
+
+Maintainers can start a release in GitHub Actions by running **publish-cli**
+with **Run workflow**. Choose a patch, minor, or major version bump, a GitHub
+environment, and the npm channel. Staging releases use `alpha` or `beta`;
+production releases use the `production` channel, published as npm's `latest`
+tag with a Homebrew formula attached to the GitHub release. The workflow builds,
+tests, and smoke-tests the CLI before publishing, then commits the version bump
+and creates a matching `v` tag and GitHub release.
+
+The GitHub `production` environment needs an `NPM_TOKEN` secret and can require
+review before publishing. To use staging, create a `staging` environment and add
+an `NPM_TOKEN` secret there as well.

@@ -1,20 +1,52 @@
 name: publish-cli
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: Semantic version increment
+        type: choice
+        required: true
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
+      environment:
+        description: GitHub environment used for release credentials and approvals
+        type: choice
+        required: true
+        default: staging
+        options:
+          - staging
+          - production
+      release_channel:
+        description: npm dist-tag and release stability
+        type: choice
+        required: true
+        default: alpha
+        options:
+          - alpha
+          - beta
+          - production
 
 permissions:
   contents: write
   id-token: write
 
+concurrency:
+  group: publish-cli-${{ inputs.environment }}
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest
-    environment: production
+    environment: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 10.12.4
@@ -22,35 +54,64 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
+      - name: Validate release selection
+        env:
+          RELEASE_ENVIRONMENT: ${{ inputs.environment }}
+          RELEASE_CHANNEL: ${{ inputs.release_channel }}
+        run: |
+          if [ "$RELEASE_ENVIRONMENT" = staging ] && [ "$RELEASE_CHANNEL" = production ]; then
+            echo "Staging releases must use the alpha or beta channel." >&2
+            exit 1
+          fi
       - run: pnpm install --frozen-lockfile
+      - name: Bump CLI version
+        id: version
+        env:
+          VERSION_BUMP: ${{ inputs.version_bump }}
+          RELEASE_CHANNEL: ${{ inputs.release_channel }}
+        run: |
+          VERSION="$(node scripts/bump-cli-version.mjs "$VERSION_BUMP" "$RELEASE_CHANNEL")"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Release version: $VERSION"
       - run: pnpm build --filter=@chess/cli...
       - run: pnpm --filter @chess/cli test
-      - name: Check release version
-        run: |
-          PACKAGE_VERSION="$(node -p "require('./apps/cli/package.json').version")"
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          test "$PACKAGE_VERSION" = "$TAG_VERSION"
-      - name: Stage the publishable package
+      - name: Stage and smoke-test the publishable package
         run: |
           node scripts/prepare-cli-package.mjs "$RUNNER_TEMP/chess-package"
           mkdir -p "$RUNNER_TEMP/chess-pack"
           npm pack --json --pack-destination "$RUNNER_TEMP/chess-pack" "$RUNNER_TEMP/chess-package"
-          VERSION="${GITHUB_REF_NAME#v}"
-          npm install --prefix "$RUNNER_TEMP/chess-cli-install" --no-audit --no-fund "$RUNNER_TEMP/chess-pack/chess-cli-${VERSION}.tgz"
+          npm install --prefix "$RUNNER_TEMP/chess-cli-install" --no-audit --no-fund "$RUNNER_TEMP/chess-pack/chess-cli-${{ steps.version.outputs.version }}.tgz"
           node scripts/smoke-installed-cli.mjs "$RUNNER_TEMP/chess-cli-install/node_modules/.bin/chess"
+      - name: Commit version and create release tag
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/cli/package.json
+          git commit -m "chore(cli): release v${VERSION}"
+          git tag "v${VERSION}"
+          git push origin "HEAD:${GITHUB_REF_NAME}" --follow-tags
       - name: Publish to npm
-        run: npm publish "$RUNNER_TEMP/chess-package" --provenance --access public
+        run: npm publish "$RUNNER_TEMP/chess-package" --provenance --access public --tag "${{ inputs.release_channel == 'production' && 'latest' || inputs.release_channel }}"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Prepare Homebrew formula
+        if: inputs.release_channel == 'production'
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${{ steps.version.outputs.version }}"
           TARBALL="$(npm view "@chess/cli@${VERSION}" dist.tarball)"
           curl --fail --location "$TARBALL" --output "$RUNNER_TEMP/chess-cli.tgz"
           SHA256="$(shasum -a 256 "$RUNNER_TEMP/chess-cli.tgz" | cut -d ' ' -f 1)"
           node scripts/generate-homebrew-formula.mjs "$VERSION" "$TARBALL" "$SHA256" "$RUNNER_TEMP/chess-cli.rb"
-      - name: Create release with Homebrew formula
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
-          files: ${{ runner.temp }}/chess-cli.rb
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_CHANNEL: ${{ inputs.release_channel }}
+        run: |
+          if [ "$RELEASE_CHANNEL" = production ]; then
+            gh release create "v${VERSION}" "$RUNNER_TEMP/chess-cli.rb" --title "Chess CLI v${VERSION}" --generate-notes
+          else
+            gh release create "v${VERSION}" --title "Chess CLI v${VERSION} (${RELEASE_CHANNEL})" --generate-notes --prerelease
+          fi
