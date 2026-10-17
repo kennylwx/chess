@@ -1,3 +1,26 @@
 <!doctype html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>check — chess terminal</title><link rel="stylesheet" href="/src/style.css"></head>
-<body><main class="terminal"><header><div class="lights"><i></i><i></i><i></i></div><span>check — chess@cloud</span><span id="connection">● ONLINE</span></header><section id="screen" aria-live="polite"><div class="banner">CHECK <small>CHESS IN YOUR TERMINAL</small></div><pre id="output"></pre></section><form id="command-form"><label for="command">❯</label><input id="command" autofocus autocomplete="off" spellcheck="false" placeholder="move the queen up by 1"><button>ENTER</button></form><footer><span>Type <b>help</b> for commands</span><label>ELO <input id="elo" type="number" min="1320" max="3190" value="1350"></label></footer></main><script type="module" src="/src/main.ts"></script></body></html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Chess — your move</title><link rel="stylesheet" href="/src/style.css"></head>
+<body>
+<main class="terminal">
+  <header><a class="brand" href="./">CHESS<span> / your move.</span></a><span class="engine-label"><i></i> STOCKFISH 19</span></header>
+  <section class="toolbar" aria-label="Game settings">
+    <label>PLAY AS <select id="side"><option value="w">White</option><option value="b">Black</option></select></label>
+    <label>ELO <input id="elo" type="number" min="1320" max="3190" step="1" value="1500" required></label>
+    <div class="actions"><button id="undo" type="button" title="Undo your last turn (Ctrl+U)">↶ Undo <kbd>Ctrl U</kbd></button><button id="new" type="button">New game</button></div>
+  </section>
+  <section id="screen" aria-label="Chess game">
+    <div class="board-heading"><span id="turn">WHITE TO MOVE</span><span id="player">YOU ARE WHITE</span></div>
+    <div id="board" aria-label="Chessboard"></div>
+    <div id="moves" tabindex="0" aria-label="Move history">Moves: —</div>
+  </section>
+  <section class="feedback" aria-label="Game feedback">
+    <p id="output" role="status" aria-live="polite">Your move. Try e4 or describe a move.</p>
+    <div id="suggestions" aria-label="Suggested legal moves"></div>
+    <button id="retry" type="button" hidden>Retry Stockfish</button>
+  </section>
+  <form id="command-form"><label for="command" class="prompt">❯<span class="sr-only">Your move or command</span></label><input id="command" autofocus autocomplete="off" spellcheck="false" placeholder="e4, Nf3, or describe your move…"><button id="submit" type="submit">Enter ↵</button></form>
+  <footer><span>Exact notation. Your decisions.</span><button id="help" type="button">Commands ?</button></footer>
+</main>
+<script type="module" src="/src/main.ts"></script>
+</body></html>

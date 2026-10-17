@@ -1,8 +1,11 @@
-import type { Chess } from '@check/chess';
-export interface MoveResult { move:string; fen:string; explanation:string }
-export class CheckServerClient {
-  constructor(private readonly baseUrl=process.env.CHECK_SERVER_URL||'http://localhost:8000'){}
+import type { Chess } from '@chess/chess';
+import { ResolutionError, type MoveResult } from '@chess/chess/interaction';
+export { ResolutionError, type MoveResult } from '@chess/chess/interaction';
+export class ChessServerClient {
+  constructor(private readonly baseUrl=process.env.CHESS_SERVER_URL||'http://localhost:8000', private readonly signal?:AbortSignal){}
   async resolve(text:string,chess:Chess):Promise<MoveResult>{return this.post('/api/resolve',{instruction:text,fen:chess.fen()});}
-  async engine(fen:string,elo:number,depth:number):Promise<MoveResult>{return this.post('/api/engine',{fen,elo,depth});}
-  private async post(path:string,body:unknown):Promise<MoveResult>{const response=await fetch(this.baseUrl.replace(/\/$/,'')+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});if(!response.ok)throw new Error(`Check server failed (${response.status}): ${(await response.text()).slice(0,200)}`);return response.json() as Promise<MoveResult>;}
+  private async post(path:string,body:unknown):Promise<MoveResult>{const response=await fetch(this.baseUrl.replace(/\/$/,'')+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body),signal:this.signal});if(!response.ok){
+    const body = await response.json().catch(() => ({})) as {detail?:unknown};
+    throw new ResolutionError(typeof body.detail === 'string' ? body.detail : `Chess server failed (${response.status})`, response.status);
+  }return response.json() as Promise<MoveResult>;}
 }

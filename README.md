@@ -1,81 +1,71 @@
-# Check
+# Chess
 
-Play chess against Stockfish from a terminal or browser. Both clients use the
-same FastAPI cloud service for TypeSafe JEV natural-language resolution and
-engine moves, so API credentials and Stockfish never reach an end user.
+Play chess against Stockfish in your browser or terminal. Enter chess notation
+or describe your move in plain English.
 
-## Monorepo
+## Setup
 
-This is a pnpm workspace orchestrated by Turborepo:
-
-- `apps/cli` — the installable `check` TypeScript CLI.
-- `apps/web` — responsive Vite/TypeScript chess application.
-- `apps/server` — FastAPI service hosting JEV and Stockfish.
-- `packages/chess` — shared, strictly typed chess rules and FEN package.
-
-## Requirements
-
-- Node.js 20+ and pnpm 10
-- Python 3.12 and [uv](https://docs.astral.sh/uv/)
-- Stockfish on the server's `PATH`
-- A TypeSafe API key for the JEV model
+Install Node.js 22.12+ and pnpm 10. For the browser or plain-English moves, also
+install Python 3.12 and [uv](https://docs.astral.sh/uv/). From the project folder:
 
 ```sh
 pnpm install
-uv sync --all-packages --all-groups
-export TYPESAFE_API_KEY='your-key'
+pnpm run setup
+```
+
+Setup installs the Python dependencies and creates `.env` from `.env.example`
+without overwriting an existing file. Add your `TYPESAFE_API_KEY` to `.env` for
+plain-English moves. For terminal-only play with chess notation, you can skip
+`pnpm run setup`. Stockfish is included with the CLI.
+
+## Play in your browser
+
+The browser server requires a separate Stockfish installation. Set
+`STOCKFISH_PATH` in `.env` if it isn't on your `PATH`.
+
+```sh
 pnpm dev
 ```
 
-The root `pyproject.toml` defines an uv workspace and `apps/server` is its
-`check-server` member. Turborepo starts the API at `http://localhost:8000` and the website at
-`http://localhost:5173`. Run the CLI in another terminal:
+Leave this running and open http://localhost:5173. You play as White. Enter a
+move and Stockfish replies automatically. Adjust the ELO field to change the
+difficulty (1320–3190).
+
+## Play in your terminal
+
+Install the `chess` command:
 
 ```sh
-pnpm --filter @check/cli build
-node apps/cli/bin/check.js --server http://localhost:8000 --elo 1500
+pnpm cli:install
+chess --elo 1500
 ```
 
-Set `CHECK_SERVER_URL` for the CLI or `VITE_CHECK_SERVER_URL` when building the
-website for a deployed API. Server configuration supports `TYPESAFE_BASE_URL`,
-`TYPESAFE_MODEL`, `STOCKFISH_PATH`, and comma-separated `CHECK_ORIGINS`.
+If pnpm asks you to set up its global bin directory, run `pnpm setup`, restart
+your terminal, and retry `pnpm cli:install`.
 
-## Cloud API
+Or run it directly from the project folder with `pnpm chess --elo 1500`.
+Stockfish runs locally; no server or separate engine installation is needed.
+For plain-English moves, keep `pnpm dev` running in another terminal.
 
-`POST /api/resolve` accepts `{ instruction, fen }`. The server sends the current
-FEN and legal moves to JEV, verifies its response with `python-chess`, and returns
-`{ move, fen, explanation }`. `POST /api/engine` accepts `{ fen, elo, depth }`
-and returns a verified Stockfish move in the same shape. `GET /health` is suitable
-for container probes.
+The board updates in place as you play, with a single row of algebraic moves
+(such as `1. e4 e5 2. Nf3 Nc6`) underneath. `quit` or Ctrl+C restores your terminal.
+Ghostty and Kitty show a large green board with illustrated pieces automatically.
+Use `--graphics text` for the text board or `--graphics kitty` to force images in
+another terminal that supports the Kitty graphics protocol.
 
-The server deliberately owns both integrations: neither browser nor CLI receives
-the JEV key or direct access to the engine process.
+Add `--color black` to play as Black, `--server URL` to use another server, or
+`--help` to see all options.
 
-## Web terminal and feedback loop
+## Moves and commands
 
-The browser intentionally mirrors the CLI rather than presenting a graphical
-dashboard. It accepts `e2e4`, `Nf3`, unrestricted instructions, `fen`, `undo`,
-`new`, and `help` at a terminal prompt. Exact notation is validated locally;
-natural language and Stockfish turns go through the same cloud endpoints as the
-CLI.
+Enter a move such as `e2e4`, `Nf3`, or `move the pawn from e2 to e4`.
+Notation must match exactly, including `x` for captures and `+`/`#` for check.
+Unrecognized moves show up to five legal suggestions based on your input.
+Type a suggestion to play it; suggestions never move a piece automatically.
 
-Playwright exercises commands against mocked cloud responses and maintains a
-visual snapshot. The screenshot project writes the reviewable current UI to
-`apps/web/screenshots/check-terminal.png`. CI uploads that image, the HTML report,
-and failure artifacts on every run, making visual inspection part of the normal
-feedback loop.
-
-```sh
-pnpm --filter @check/web exec playwright install chromium
-pnpm --filter @check/web test
-pnpm --filter @check/web screenshot
-```
-
-## Quality checks
-
-```sh
-pnpm typecheck
-pnpm test
-pnpm build
-uv run --package check-server pytest -q
-```
+- `help` — show available commands.
+- **Ctrl+U** or `undo` — take back your move and Stockfish’s reply, even while it is thinking.
+- `fen` — show the current position as FEN.
+- `new` — start a new game (browser only).
+- `fen <position>` — load a FEN position (terminal only).
+- `quit` — exit (terminal only).

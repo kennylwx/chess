@@ -1,5 +1,5 @@
 {
-  "name": "@check/chess",
+  "name": "@chess/chess",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -7,11 +7,16 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    }
+    },
+    "./interaction": {
+      "types": "./dist/interaction.d.ts",
+      "default": "./dist/interaction.js"
+    },
+    "./pieces": "./assets/pieces.json"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build --silent && node --test"
+    "test": "pnpm build && node --test"
   }
 }

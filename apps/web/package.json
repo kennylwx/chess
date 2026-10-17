@@ -1,14 +1,15 @@
 {
-  "name": "@check/web",
+  "name": "@chess/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "dependencies": {
-    "@check/chess": "workspace:*"
+    "@chess/chess": "workspace:*",
+    "stockfish": "19.0.1"
   },
   "devDependencies": {
-    "vite": "^7.1.0",
-    "@playwright/test": "^1.55.0"
+    "@playwright/test": "^1.55.0",
+    "vite": "^7.1.0"
   },
   "scripts": {
     "dev": "vite",

@@ -1,9 +1,24 @@
 {
-  "name": "@check/cli",
+  "name": "@chess/cli",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "bin": { "check": "./bin/check.js" },
-  "dependencies": { "@check/chess": "workspace:*" },
-  "scripts": { "build": "tsc -p tsconfig.json", "typecheck": "tsc -p tsconfig.json --noEmit", "dev": "tsc -w", "test": "node --test" }
+  "bin": {
+    "chess": "./bin/chess.js"
+  },
+  "dependencies": {
+    "@chess/chess": "workspace:*",
+    "@resvg/resvg-js": "^2.6.2",
+    "stockfish": "19.0.1"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsc -w",
+    "test": "node --test",
+    "start": "node bin/chess.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5"
+  }
 }
