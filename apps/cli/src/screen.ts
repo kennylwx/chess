@@ -9,6 +9,7 @@ interface Output {
 /** Keep game frames out of shell scrollback and restore the shell on exit. */
 export class GameScreen {
   private opened = false;
+  private cursorStyled = false;
   constructor(readonly active: boolean, private readonly output: Output = stdout, private readonly manageScreen = true) {}
 
   open(): void {
@@ -48,22 +49,29 @@ export class GameScreen {
     const width = Math.max(1, (this.output.columns || 80) - 1);
     const bottom = Math.max(6, this.output.rows || 40);
     const visible = [...value].slice(-Math.max(0, width - 4)).join('');
-    const content = value ? visible : placeholder;
     const foreground = value ? '\x1b[38;2;235;248;226m' : '\x1b[38;2;139;168;144m';
     const horizontalPadding = 1;
     const fieldTextWidth = Math.max(0, width - horizontalPadding - 2);
-    const shown = [...content].slice(-fieldTextWidth).join('');
+    const shown = value
+      ? [...visible].slice(-fieldTextWidth).join('')
+      : [...placeholder].slice(0, Math.max(0, fieldTextWidth - 1)).join('');
     const prefix = ' ';
+    const displayed = value ? shown : ` ${shown}`;
     const background = '\x1b[48;2;12;42;34m';
     const paddingRow = `${background}${' '.repeat(width + 1)}\x1b[0m`;
-    const row = `${background}\x1b[38;2;190;221;173m${prefix}${foreground}${shown}${' '.repeat(Math.max(0, width + 1 - prefix.length - [...shown].length))}\x1b[0m`;
-    const cursor = Math.min(width, prefix.length + [...shown].length + 1);
+    const row = `${background}\x1b[38;2;190;221;173m${prefix}${foreground}${displayed}${' '.repeat(Math.max(0, width + 1 - prefix.length - [...displayed].length))}\x1b[0m`;
+    const cursor = value ? Math.min(width, prefix.length + [...shown].length + 1) : 2;
+    this.cursorStyled = true;
     return `\x1b[${bottom - 2};1H${paddingRow}` +
       `\x1b[${bottom - 1};1H${row}` +
-      `\x1b[${bottom};1H${paddingRow}\x1b[${bottom - 1};${cursor}H`;
+      `\x1b[${bottom};1H${paddingRow}\x1b[${bottom - 1};${cursor}H\x1b[5 q\x1b[?25h`;
   }
 
   close(): void {
+    if (this.cursorStyled) {
+      this.output.write('\x1b[0 q');
+      this.cursorStyled = false;
+    }
     if (this.opened) {
       this.output.write('\x1b[?2026l\x1b[?25h\x1b[?1049l');
       this.opened = false;
@@ -94,7 +102,7 @@ export class MenuScreen {
     const horizontalPadding = Math.min(2, Math.floor((width - 1) / 2));
     const status = `\x1b[38;2;210;225;202m${' '.repeat(horizontalPadding)}${fit(footer).slice(0, width - horizontalPadding * 2).padEnd(width - horizontalPadding * 2)}${' '.repeat(horizontalPadding)}\x1b[0m`;
     const body = content.split('\n').map(line => fit(line)).join('\r\n');
-    this.output.write(`\x1b[?2026h\x1b[H\x1b[2J${title}\r\n\r\n${body}\r\n\r\n${status}\r\n\x1b[?2026l`);
+    this.output.write(`\x1b[?25l\x1b[?2026h\x1b[H\x1b[2J${title}\r\n\r\n${body}\r\n\r\n${status}\r\n\x1b[?2026l`);
   }
 
   close(): void {

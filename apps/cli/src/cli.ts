@@ -34,7 +34,15 @@ export function commandHelp(): string {
     '',
     'SHORTCUTS',
     'Ctrl+C        Quit',
+    'Ctrl+U        Clear input',
   ].join('\n');
+}
+
+export function editGameInput(value: string, text: string, key: Key): string {
+  if ((key?.ctrl && key.name === 'u') || (key?.meta && key.name === 'backspace')) return '';
+  if (key?.name === 'backspace') return [...value].slice(0, -1).join('');
+  if (!key?.ctrl && !key?.meta && text && !/[\x00-\x1f\x7f]/.test(text)) return value + text;
+  return value;
 }
 
 const promptColor = '\x1b[38;2;190;221;173m';
@@ -293,8 +301,7 @@ async function playGame(config: GameConfig, options: { graphics: GraphicsMode; d
       const onKey = (text: string, key: Key): void => {
         if (key?.ctrl && key.name === 'c') { stop(); finish(''); return; }
         if (key?.name === 'return' || key?.name === 'enter') { finish(value); return; }
-        if (key?.name === 'backspace') value = [...value].slice(0, -1).join('');
-        else if (!key?.ctrl && !key?.meta && text && !/[\x00-\x1f\x7f]/.test(text)) value += text;
+        value = editGameInput(value, text, key);
         redraw();
       };
       redrawInput = redraw;

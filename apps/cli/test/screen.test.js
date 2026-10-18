@@ -53,6 +53,7 @@ test('keeps a distinct input field on the bottom row and replaces its placeholde
   assert.match(output, /\x1b\[29;1H/);
   assert.equal(output.match(/\x1b\[48;2;12;42;34m/g)?.length, 3);
   assert.ok(output.includes('Type any moves e.g. e4 or e pawn up 2'));
+  assert.match(output, /\x1b\[29;2H\x1b\[5 q\x1b\[\?25h/);
   assert.ok(!output.includes('❯'));
   assert.match(output, /\/help/);
   assert.ok(!output.includes('Ctrl+U Undo  Ctrl+B Menu  Ctrl+C Quit'));
@@ -61,6 +62,7 @@ test('keeps a distinct input field on the bottom row and replaces its placeholde
   assert.match(output, /\x1b\[29;1H/);
   assert.ok(output.includes('e2e4'));
   assert.match(output, /\x1b\[29;6H/);
+  assert.match(output, /\x1b\[29;6H\x1b\[5 q\x1b\[\?25h/);
   assert.ok(!output.includes('Type any moves e.g. e4 or e pawn up 2'));
 });
 
@@ -83,6 +85,7 @@ test('menu screens replace content in one alternate screen and restore the shell
   assert.equal(output.split('\x1b[?1049h').length - 1, 1);
   assert.equal(output.split('\x1b[H\x1b[2J').length - 1, 2);
   assert.ok(output.indexOf('CHESS') < output.indexOf('LOAD GAME'));
+  assert.equal(output.match(/\x1b\[\?25l/g)?.length, 3);
   assert.match(output, /\/back · \/quit · Ctrl\+C quit/);
   assert.ok(!output.includes('\x1b[48;'));
   assert.ok(output.endsWith('\x1b[?25h\x1b[?1049l'));
