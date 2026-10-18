@@ -21,16 +21,92 @@ on:
           - alpha
           - beta
           - production
+  pull_request:
+    types: [closed]
+    branches: [main]
+
 permissions:
   contents: write
   id-token: write
+  pull-requests: write
 
 concurrency:
   group: publish-cli
   cancel-in-progress: false
 
 jobs:
+  prepare-release:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: pnpm install --frozen-lockfile
+      - name: Bump CLI version
+        id: release
+        env:
+          VERSION_BUMP: ${{ inputs.version_bump }}
+          RELEASE_CHANNEL: ${{ inputs.release_channel }}
+        run: |
+          BASE_VERSION="$(node -p "require('./apps/cli/package.json').version")"
+          VERSION="$(node scripts/bump-cli-version.mjs "$VERSION_BUMP" "$RELEASE_CHANNEL" "$BASE_VERSION")"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "channel=$RELEASE_CHANNEL" >> "$GITHUB_OUTPUT"
+          echo "Release version: $VERSION"
+      - run: pnpm build --filter=zchess...
+      - run: pnpm --filter zchess test
+      - name: Stage and smoke-test the release package
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          node scripts/prepare-cli-package.mjs "$RUNNER_TEMP/chess-package"
+          mkdir -p "$RUNNER_TEMP/chess-pack"
+          npm pack --json --pack-destination "$RUNNER_TEMP/chess-pack" "$RUNNER_TEMP/chess-package"
+          npm install --prefix "$RUNNER_TEMP/chess-cli-install" --no-audit --no-fund "$RUNNER_TEMP/chess-pack/zchess-${VERSION}.tgz"
+          node scripts/smoke-installed-cli.mjs "$RUNNER_TEMP/chess-cli-install/node_modules/.bin/chess"
+      - name: Create a version-bump pull request
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
+        run: |
+          BRANCH="release/cli/v${VERSION}"
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            echo "Release branch $BRANCH already exists. Close or merge its pull request before starting another release." >&2
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git add apps/cli/package.json
+          git commit -m "chore(cli): release v${VERSION}"
+          git push origin "$BRANCH"
+          gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title "chore(cli): release v${VERSION}" \
+            --body "Automated CLI release preparation.
+
+          - Version: ${VERSION}
+          - npm channel: ${RELEASE_CHANNEL}
+
+          Merge this PR to publish the release."
+
   publish-release:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.head.ref, 'release/cli/v')
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -38,7 +114,7 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          token: ${{ secrets.GH_PAT || github.token }}
+          token: ${{ secrets.GH_PAT }}
       - uses: pnpm/action-setup@v4
         with:
           version: 10.12.4
@@ -47,18 +123,26 @@ jobs:
           node-version: 24
       - name: Verify npm trusted publisher
         run: node scripts/check-npm-trusted-publisher.mjs
-      - run: pnpm install --frozen-lockfile
-      - name: Bump CLI version
+      - name: Read and verify release version
         id: release
         env:
-          VERSION_BUMP: ${{ inputs.version_bump }}
-          RELEASE_CHANNEL: ${{ inputs.release_channel }}
+          RELEASE_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
-          BASE_VERSION="$(git show "${GITHUB_SHA}:apps/cli/package.json" | node -e "console.log(JSON.parse(require('node:fs').readFileSync(0, 'utf8')).version)")"
-          VERSION="$(node scripts/bump-cli-version.mjs "$VERSION_BUMP" "$RELEASE_CHANNEL" "$BASE_VERSION")"
+          VERSION="${RELEASE_BRANCH#release/cli/v}"
+          CHANNEL=production
+          case "$VERSION" in
+            *-alpha.*) CHANNEL=alpha ;;
+            *-beta.*) CHANNEL=beta ;;
+            *-*) echo "Unsupported release version: $VERSION" >&2; exit 1 ;;
+          esac
+          ACTUAL_VERSION="$(node -p "require('./apps/cli/package.json').version")"
+          if [ "$ACTUAL_VERSION" != "$VERSION" ]; then
+            echo "Merged CLI version $ACTUAL_VERSION does not match PR version $VERSION." >&2
+            exit 1
+          fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "channel=$RELEASE_CHANNEL" >> "$GITHUB_OUTPUT"
-          echo "Release version: $VERSION"
+          echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
+      - run: pnpm install --frozen-lockfile
       - run: pnpm build --filter=zchess...
       - run: pnpm --filter zchess test
       - name: Stage and smoke-test the publishable package
@@ -70,17 +154,6 @@ jobs:
           npm pack --json --pack-destination "$RUNNER_TEMP/chess-pack" "$RUNNER_TEMP/chess-package"
           npm install --prefix "$RUNNER_TEMP/chess-cli-install" --no-audit --no-fund "$RUNNER_TEMP/chess-pack/zchess-${VERSION}.tgz"
           node scripts/smoke-installed-cli.mjs "$RUNNER_TEMP/chess-cli-install/node_modules/.bin/chess"
-      - name: Commit version on main
-        env:
-          VERSION: ${{ steps.release.outputs.version }}
-        run: |
-          if ! git diff --quiet -- apps/cli/package.json; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add apps/cli/package.json
-            git commit -m "chore(cli): release v${VERSION}"
-            git push origin HEAD:main
-          fi
       - name: Create and push release tag
         env:
           VERSION: ${{ steps.release.outputs.version }}
@@ -100,7 +173,6 @@ jobs:
           VERSION: ${{ steps.release.outputs.version }}
           RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
         run: |
-          npm --version
           if npm view "zchess@${VERSION}" version >/dev/null 2>&1; then
             echo "zchess@${VERSION} is already published; continuing with the remaining release steps."
           else
@@ -118,7 +190,7 @@ jobs:
           node scripts/generate-homebrew-formula.mjs "$VERSION" "$TARBALL" "$SHA256" "$RUNNER_TEMP/chess-cli.rb"
       - name: Create GitHub release
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
           VERSION: ${{ steps.release.outputs.version }}
           RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
         run: |
