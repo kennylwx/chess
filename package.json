@@ -8,8 +8,8 @@
     "test": "turbo test",
     "typecheck": "turbo typecheck",
     "setup": "node scripts/setup.mjs && turbo run setup",
-    "chess": "turbo build --filter=@chess/cli... && pnpm --filter @chess/cli start",
-    "cli:install": "turbo build --filter=@chess/cli... && pnpm link --global ./apps/cli"
+    "chess": "turbo build --filter=@kennylwx/cli... && pnpm --filter @kennylwx/cli start",
+    "cli:install": "turbo build --filter=@kennylwx/cli... && pnpm link --global ./apps/cli"
   },
   "devDependencies": {
     "turbo": "^2.5.6",

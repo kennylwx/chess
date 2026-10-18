@@ -14,16 +14,16 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run setup
       - run: pnpm typecheck
-      - run: pnpm build --filter=@chess/cli...
+      - run: pnpm build --filter=@kennylwx/cli...
       - name: Install and smoke-test the packed CLI
         run: |
           mkdir -p "$RUNNER_TEMP/chess-pack"
           node scripts/prepare-cli-package.mjs "$RUNNER_TEMP/chess-package"
           npm pack --json --pack-destination "$RUNNER_TEMP/chess-pack" "$RUNNER_TEMP/chess-package"
           VERSION="$(node -p "require('./apps/cli/package.json').version")"
-          npm install --prefix "$RUNNER_TEMP/chess-cli-install" --no-audit --no-fund "$RUNNER_TEMP/chess-pack/chess-cli-${VERSION}.tgz"
+          npm install --prefix "$RUNNER_TEMP/chess-cli-install" --no-audit --no-fund "$RUNNER_TEMP/chess-pack/kennylwx-cli-${VERSION}.tgz"
           node scripts/smoke-installed-cli.mjs "$RUNNER_TEMP/chess-cli-install/node_modules/.bin/chess"
-          node scripts/generate-homebrew-formula.mjs 0.0.0 https://registry.npmjs.org/chess-cli/-/chess-cli-0.0.0.tgz "$(printf '0%.0s' {1..64})" "$RUNNER_TEMP/chess-cli.rb"
+          node scripts/generate-homebrew-formula.mjs 0.0.0 https://registry.npmjs.org/@kennylwx/cli/-/cli-0.0.0.tgz "$(printf '0%.0s' {1..64})" "$RUNNER_TEMP/chess-cli.rb"
           ruby -c "$RUNNER_TEMP/chess-cli.rb"
       - run: pnpm --filter @chess/web exec playwright install --with-deps chromium
       - run: pnpm test
