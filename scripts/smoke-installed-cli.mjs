@@ -18,7 +18,7 @@ child.stdout.on('data', data => {
   output += data;
   if (!sentQuit && /Black plays \S+/.test(output)) {
     sentQuit = true;
-    child.stdin.write('q\n');
+    child.stdin.write('/quit\n');
   }
 });
 child.stderr.on('data', data => { output += data; });
