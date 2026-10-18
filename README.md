@@ -28,7 +28,4 @@ chess
 
 ```sh
 gh workflow run release.yml --ref main -f version_bump=patch -f release_channel=production
-gh pr list --state open
 ```
-
-Merge the generated release PR to publish. Use `minor` or `major` for the version bump, or `alpha` or `beta` for a prerelease.
