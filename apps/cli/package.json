@@ -1,6 +1,6 @@
 {
   "name": "zchess",
-  "version": "0.1.4-alpha.0",
+  "version": "0.1.5-alpha.0",
   "type": "module",
   "engines": {
     "node": ">=22.13.0"
