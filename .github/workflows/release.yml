@@ -21,22 +21,17 @@ on:
           - alpha
           - beta
           - production
-  pull_request:
-    types: [closed]
-    branches: [main]
 
 permissions:
   contents: write
   id-token: write
-  pull-requests: write
 
 concurrency:
   group: publish-cli
   cancel-in-progress: false
 
 jobs:
-  prepare-release:
-    if: github.event_name == 'workflow_dispatch'
+  publish-cli:
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -50,7 +45,7 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           if [ -z "$GH_PAT" ]; then
-            echo "GH_PAT is missing. Add it to the production environment so this job can create the release PR and trigger publishing after merge." >&2
+            echo "GH_PAT is missing from the production environment." >&2
             exit 1
           fi
       - uses: pnpm/action-setup@v4
@@ -59,6 +54,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Verify npm trusted publisher
+        run: node scripts/check-npm-trusted-publisher.mjs
       - run: pnpm install --frozen-lockfile
       - name: Bump CLI version
         id: release
@@ -82,113 +79,25 @@ jobs:
           npm pack --json --pack-destination "$RUNNER_TEMP/zchess-pack" "$RUNNER_TEMP/zchess-package"
           npm install --prefix "$RUNNER_TEMP/zchess-cli-install" --no-audit --no-fund "$RUNNER_TEMP/zchess-pack/zchess-${VERSION}.tgz"
           node scripts/smoke-installed-cli.mjs "$RUNNER_TEMP/zchess-cli-install/node_modules/.bin/chess"
-      - name: Create a version-bump pull request
+      - name: Commit version and push release tag
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
           VERSION: ${{ steps.release.outputs.version }}
-          RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
         run: |
-          BRANCH="release/cli/v${VERSION}"
-          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
-            echo "Release branch $BRANCH already exists. Close or merge its pull request before starting another release." >&2
-            exit 1
-          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git switch -c "$BRANCH"
           git add apps/cli/package.json
           git commit -m "chore(cli): release v${VERSION}"
-          git push origin "$BRANCH"
-          gh pr create \
-            --base main \
-            --head "$BRANCH" \
-            --title "chore(cli): release v${VERSION}" \
-            --body "Automated CLI release preparation.
-
-          - Version: ${VERSION}
-          - npm channel: ${RELEASE_CHANNEL}
-
-          Merge this PR to publish the release."
-
-  publish-release:
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.action == 'closed' &&
-      github.event.pull_request.merged == true &&
-      startsWith(github.event.pull_request.head.ref, 'release/cli/v')
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
-          token: ${{ secrets.GH_PAT || github.token }}
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.12.4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - name: Verify npm trusted publisher
-        run: node scripts/check-npm-trusted-publisher.mjs
-      - name: Read and verify release version
-        id: release
-        env:
-          RELEASE_BRANCH: ${{ github.event.pull_request.head.ref }}
-        run: |
-          VERSION="${RELEASE_BRANCH#release/cli/v}"
-          CHANNEL=production
-          case "$VERSION" in
-            *-alpha.*) CHANNEL=alpha ;;
-            *-beta.*) CHANNEL=beta ;;
-            *-*) echo "Unsupported release version: $VERSION" >&2; exit 1 ;;
-          esac
-          ACTUAL_VERSION="$(node -p "require('./apps/cli/package.json').version")"
-          if [ "$ACTUAL_VERSION" != "$VERSION" ]; then
-            echo "Merged CLI version $ACTUAL_VERSION does not match PR version $VERSION." >&2
-            exit 1
-          fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build --filter=zchess...
-      - run: pnpm --filter zchess test
-      - name: Stage and smoke-test the publishable package
-        env:
-          VERSION: ${{ steps.release.outputs.version }}
-        run: |
-          node scripts/prepare-cli-package.mjs "$RUNNER_TEMP/zchess-package"
-          mkdir -p "$RUNNER_TEMP/zchess-pack"
-          npm pack --json --pack-destination "$RUNNER_TEMP/zchess-pack" "$RUNNER_TEMP/zchess-package"
-          npm install --prefix "$RUNNER_TEMP/zchess-cli-install" --no-audit --no-fund "$RUNNER_TEMP/zchess-pack/zchess-${VERSION}.tgz"
-          node scripts/smoke-installed-cli.mjs "$RUNNER_TEMP/zchess-cli-install/node_modules/.bin/chess"
-      - name: Create and push release tag
-        env:
-          VERSION: ${{ steps.release.outputs.version }}
-        run: |
-          if git rev-parse "refs/tags/v${VERSION}" >/dev/null 2>&1; then
-            TAG_COMMIT="$(git rev-list -n 1 "v${VERSION}")"
-            if [ "$TAG_COMMIT" != "$(git rev-parse HEAD)" ]; then
-              echo "Tag v${VERSION} already points to a different commit." >&2
-              exit 1
-            fi
-          else
-            git tag "v${VERSION}"
-          fi
+          git push origin HEAD:main
+          git tag "v${VERSION}"
           git push origin "v${VERSION}"
       - name: Publish to npm
         env:
           VERSION: ${{ steps.release.outputs.version }}
           RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
         run: |
-          if npm view "zchess@${VERSION}" version >/dev/null 2>&1; then
-            echo "zchess@${VERSION} is already published; continuing with the remaining release steps."
-          else
-            TAG="$RELEASE_CHANNEL"
-            if [ "$RELEASE_CHANNEL" = production ]; then TAG=latest; fi
-            npm publish "$RUNNER_TEMP/zchess-package" --provenance --access public --tag "$TAG"
-          fi
+          TAG="$RELEASE_CHANNEL"
+          if [ "$RELEASE_CHANNEL" = production ]; then TAG=latest; fi
+          npm publish "$RUNNER_TEMP/zchess-package" --provenance --access public --tag "$TAG"
       - name: Prepare Homebrew formula
         if: steps.release.outputs.channel == 'production'
         run: |
@@ -203,12 +112,7 @@ jobs:
           VERSION: ${{ steps.release.outputs.version }}
           RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
         run: |
-          if gh release view "v${VERSION}" >/dev/null 2>&1; then
-            if [ "$RELEASE_CHANNEL" = production ]; then
-              gh release upload "v${VERSION}" "$RUNNER_TEMP/zchess.rb" --clobber
-            fi
-            echo "GitHub release v${VERSION} already exists."
-          elif [ "$RELEASE_CHANNEL" = production ]; then
+          if [ "$RELEASE_CHANNEL" = production ]; then
             gh release create "v${VERSION}" "$RUNNER_TEMP/zchess.rb" --title "ZChess CLI v${VERSION}" --generate-notes
           else
             gh release create "v${VERSION}" --title "ZChess CLI v${VERSION} (${RELEASE_CHANNEL})" --generate-notes --prerelease
