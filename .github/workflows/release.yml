@@ -12,14 +12,6 @@ on:
           - patch
           - minor
           - major
-      environment:
-        description: GitHub environment used for release credentials and approvals
-        type: choice
-        required: true
-        default: staging
-        options:
-          - staging
-          - production
       release_channel:
         description: npm dist-tag and release stability
         type: choice
@@ -39,19 +31,20 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: publish-cli-${{ github.event_name == 'workflow_dispatch' && inputs.environment || github.event.pull_request.head.ref }}
+  group: publish-cli-${{ github.event_name == 'workflow_dispatch' && 'prepare' || github.event.pull_request.head.ref }}
   cancel-in-progress: false
 
 jobs:
   prepare-release:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
-          token: ${{ secrets.GH_PAT }}
+          token: ${{ secrets.GH_PAT || github.token }}
       - uses: pnpm/action-setup@v4
         with:
           version: 10.12.4
@@ -59,15 +52,6 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
-      - name: Validate release selection
-        env:
-          RELEASE_ENVIRONMENT: ${{ inputs.environment }}
-          RELEASE_CHANNEL: ${{ inputs.release_channel }}
-        run: |
-          if [ "$RELEASE_ENVIRONMENT" = staging ] && [ "$RELEASE_CHANNEL" = production ]; then
-            echo "Staging releases must use the alpha or beta channel." >&2
-            exit 1
-          fi
       - run: pnpm install --frozen-lockfile
       - name: Bump CLI version
         id: version
@@ -91,12 +75,11 @@ jobs:
           node scripts/smoke-installed-cli.mjs "$RUNNER_TEMP/chess-cli-install/node_modules/.bin/chess"
       - name: Create a version-bump pull request
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
+          GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
           VERSION: ${{ steps.version.outputs.version }}
-          RELEASE_ENVIRONMENT: ${{ inputs.environment }}
           RELEASE_CHANNEL: ${{ inputs.release_channel }}
         run: |
-          BRANCH="release/cli/v${VERSION}/${RELEASE_ENVIRONMENT}"
+          BRANCH="release/cli/v${VERSION}/production"
           if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
             echo "Release branch $BRANCH already exists. Close or merge its pull request before starting another release." >&2
             exit 1
@@ -115,7 +98,7 @@ jobs:
 
           - Version: ${VERSION}
           - npm channel: ${RELEASE_CHANNEL}
-          - GitHub environment: ${RELEASE_ENVIRONMENT}
+          - GitHub environment: production
 
           Merge this PR to publish the release."
 
@@ -126,13 +109,13 @@ jobs:
       github.event.pull_request.merged == true &&
       startsWith(github.event.pull_request.head.ref, 'release/cli/v')
     runs-on: ubuntu-latest
-    environment: ${{ endsWith(github.event.pull_request.head.ref, '/production') && 'production' || 'staging' }}
+    environment: production
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
-          token: ${{ secrets.GH_PAT }}
+          token: ${{ secrets.GH_PAT || github.token }}
       - uses: pnpm/action-setup@v4
         with:
           version: 10.12.4
@@ -154,12 +137,8 @@ jobs:
             *-*) echo "Unsupported release version: $VERSION" >&2; exit 1 ;;
             *) CHANNEL=production ;;
           esac
-          if [ "$ENVIRONMENT" != staging ] && [ "$ENVIRONMENT" != production ]; then
+          if [ "$ENVIRONMENT" != production ]; then
             echo "Unsupported release environment: $ENVIRONMENT" >&2
-            exit 1
-          fi
-          if [ "$ENVIRONMENT" = staging ] && [ "$CHANNEL" = production ]; then
-            echo "Staging releases must use the alpha or beta channel." >&2
             exit 1
           fi
           ACTUAL_VERSION="$(node -p "require('./apps/cli/package.json').version")"
@@ -169,7 +148,6 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
-          echo "environment=$ENVIRONMENT" >> "$GITHUB_OUTPUT"
       - run: pnpm install --frozen-lockfile
       - run: pnpm build --filter=@chess/cli...
       - run: pnpm --filter @chess/cli test
@@ -219,7 +197,7 @@ jobs:
           node scripts/generate-homebrew-formula.mjs "$VERSION" "$TARBALL" "$SHA256" "$RUNNER_TEMP/chess-cli.rb"
       - name: Create GitHub release
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
+          GH_TOKEN: ${{ secrets.GH_PAT || github.token }}
           VERSION: ${{ steps.release.outputs.version }}
           RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
         run: |
