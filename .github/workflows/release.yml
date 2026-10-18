@@ -54,8 +54,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Verify npm trusted publisher
-        run: node scripts/check-npm-trusted-publisher.mjs
+          registry-url: https://registry.npmjs.org
+      - name: Verify npm publication token
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "NPM_TOKEN is missing from the production environment." >&2
+            exit 1
+          fi
+          npm whoami --registry=https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
       - name: Bump CLI version
         id: release
@@ -92,6 +100,7 @@ jobs:
           git push origin "v${VERSION}"
       - name: Publish to npm
         env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           VERSION: ${{ steps.release.outputs.version }}
           RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
         run: |
