@@ -38,6 +38,7 @@ jobs:
   prepare-release:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - uses: actions/checkout@v4
         with:
@@ -49,7 +50,7 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           if [ -z "$GH_PAT" ]; then
-            echo "GH_PAT is missing. Add it under Settings > Secrets and variables > Actions > Repository secrets so this job can create the release PR and trigger publishing after merge." >&2
+            echo "GH_PAT is missing. Add it to the production environment so this job can create the release PR and trigger publishing after merge." >&2
             exit 1
           fi
       - uses: pnpm/action-setup@v4
