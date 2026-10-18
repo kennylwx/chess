@@ -17,12 +17,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/kennylwx/chess.git",
+    "url": "git+https://github.com/kennylwx/chess.git",
     "directory": "apps/cli"
   },
   "license": "MIT",
   "bin": {
-    "chess": "./bin/chess.js"
+    "chess": "bin/chess.js"
   },
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",
