@@ -4,7 +4,7 @@ Play chess against the Stockfish engine from your terminal. The published
 package includes the CLI and installs Stockfish automatically.
 
 ```sh
-npm install --global @kennylwx/cli
+npm install --global zchess
 chess
 ```
 

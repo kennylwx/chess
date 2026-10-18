@@ -59,8 +59,8 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "channel=$RELEASE_CHANNEL" >> "$GITHUB_OUTPUT"
           echo "Release version: $VERSION"
-      - run: pnpm build --filter=@kennylwx/cli...
-      - run: pnpm --filter @kennylwx/cli test
+      - run: pnpm build --filter=zchess...
+      - run: pnpm --filter zchess test
       - name: Stage and smoke-test the publishable package
         env:
           VERSION: ${{ steps.release.outputs.version }}
@@ -68,7 +68,7 @@ jobs:
           node scripts/prepare-cli-package.mjs "$RUNNER_TEMP/chess-package"
           mkdir -p "$RUNNER_TEMP/chess-pack"
           npm pack --json --pack-destination "$RUNNER_TEMP/chess-pack" "$RUNNER_TEMP/chess-package"
-          npm install --prefix "$RUNNER_TEMP/chess-cli-install" --no-audit --no-fund "$RUNNER_TEMP/chess-pack/kennylwx-cli-${VERSION}.tgz"
+          npm install --prefix "$RUNNER_TEMP/chess-cli-install" --no-audit --no-fund "$RUNNER_TEMP/chess-pack/zchess-${VERSION}.tgz"
           node scripts/smoke-installed-cli.mjs "$RUNNER_TEMP/chess-cli-install/node_modules/.bin/chess"
       - name: Commit version on main
         env:
@@ -101,8 +101,8 @@ jobs:
           RELEASE_CHANNEL: ${{ steps.release.outputs.channel }}
         run: |
           npm --version
-          if npm view "@kennylwx/cli@${VERSION}" version >/dev/null 2>&1; then
-            echo "@kennylwx/cli@${VERSION} is already published; continuing with the remaining release steps."
+          if npm view "zchess@${VERSION}" version >/dev/null 2>&1; then
+            echo "zchess@${VERSION} is already published; continuing with the remaining release steps."
           else
             TAG="$RELEASE_CHANNEL"
             if [ "$RELEASE_CHANNEL" = production ]; then TAG=latest; fi
@@ -112,7 +112,7 @@ jobs:
         if: steps.release.outputs.channel == 'production'
         run: |
           VERSION="${{ steps.release.outputs.version }}"
-          TARBALL="$(npm view "@kennylwx/cli@${VERSION}" dist.tarball)"
+          TARBALL="$(npm view "zchess@${VERSION}" dist.tarball)"
           curl --fail --location "$TARBALL" --output "$RUNNER_TEMP/chess-cli.tgz"
           SHA256="$(shasum -a 256 "$RUNNER_TEMP/chess-cli.tgz" | cut -d ' ' -f 1)"
           node scripts/generate-homebrew-formula.mjs "$VERSION" "$TARBALL" "$SHA256" "$RUNNER_TEMP/chess-cli.rb"

@@ -20,7 +20,7 @@ pnpm chess
 ## Install the published CLI
 
 ```sh
-npm install --global @kennylwx/cli
+npm install --global zchess
 chess
 ```
 

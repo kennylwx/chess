@@ -18,14 +18,14 @@ if (!oidcResponse.ok) {
 const { value: oidcToken } = await oidcResponse.json();
 if (!oidcToken) throw new Error('GitHub OIDC response did not contain a token.');
 
-const packageName = encodeURIComponent('@kennylwx/cli');
+const packageName = encodeURIComponent('zchess');
 const npmResponse = await fetch(`https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/${packageName}`, {
   method: 'POST',
   headers: { Authorization: `Bearer ${oidcToken}` },
   signal: AbortSignal.timeout(30_000),
 });
 if (!npmResponse.ok) {
-  throw new Error(`npm rejected this workflow as a trusted publisher (HTTP ${npmResponse.status}). First publish @kennylwx/cli from your npm account, then configure its trusted publisher for kennylwx/chess, release.yml, and production.`);
+  throw new Error(`npm rejected this workflow as a trusted publisher (HTTP ${npmResponse.status}). First publish zchess from your npm account, then configure its trusted publisher for kennylwx/chess, release.yml, and production.`);
 }
 
 console.log('npm trusted publisher exchange succeeded.');
