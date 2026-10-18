@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Chess, START_FEN } from '@chess/chess';
+import { Chess, START_FEN } from '@zchess/chess';
 import { engineMove } from '../dist/engine.js';
 
 for (const side of ['white', 'black']) {

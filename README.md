@@ -1,4 +1,4 @@
-# Chess
+# ZChess
 
 ## Run the website
 

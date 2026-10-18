@@ -5,9 +5,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const executable = process.argv[2];
-if (!executable) throw new Error('Usage: node smoke-installed-cli.mjs CHESS_EXECUTABLE');
+if (!executable) throw new Error('Usage: node smoke-installed-cli.mjs CLI_EXECUTABLE');
 
-const temporaryDirectory = await mkdtemp(join(tmpdir(), 'chess-cli-smoke-'));
+const temporaryDirectory = await mkdtemp(join(tmpdir(), 'zchess-cli-smoke-'));
 const child = spawn(executable, ['--elo', '1500', '--db', join(temporaryDirectory, 'games.sqlite')], { stdio: ['pipe', 'pipe', 'pipe'] });
 let output = '';
 let sentQuit = false;

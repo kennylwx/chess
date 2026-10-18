@@ -1,1 +1,1 @@
-export * from '@chess/chess/interaction';
+export * from '@zchess/chess/interaction';

@@ -17,7 +17,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kennylwx/chess.git",
+    "url": "git+https://github.com/kennylwx/zchess.git",
     "directory": "apps/cli"
   },
   "license": "MIT",
@@ -36,7 +36,7 @@
     "start": "node bin/chess.js"
   },
   "devDependencies": {
-    "@chess/chess": "workspace:*",
+    "@zchess/chess": "workspace:*",
     "@types/node": "^22.20.5",
     "esbuild": "^0.28.2"
   }

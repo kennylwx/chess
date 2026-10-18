@@ -6,8 +6,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-app = FastAPI(title="Chess Cloud", version="0.1.0")
-app.add_middleware(CORSMiddleware, allow_origins=os.getenv("CHESS_ORIGINS", "http://localhost:5173").split(","), allow_methods=["GET", "POST"], allow_headers=["*"])
+app = FastAPI(title="ZChess Cloud", version="0.1.0")
+app.add_middleware(CORSMiddleware, allow_origins=os.getenv("ZCHESS_ORIGINS", "http://localhost:5173").split(","), allow_methods=["GET", "POST"], allow_headers=["*"])
 
 class ResolveRequest(BaseModel):
     instruction: str = Field(min_length=1, max_length=500)

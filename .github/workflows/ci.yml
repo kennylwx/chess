@@ -17,15 +17,15 @@ jobs:
       - run: pnpm build --filter=zchess...
       - name: Install and smoke-test the packed CLI
         run: |
-          mkdir -p "$RUNNER_TEMP/chess-pack"
-          node scripts/prepare-cli-package.mjs "$RUNNER_TEMP/chess-package"
-          npm pack --json --pack-destination "$RUNNER_TEMP/chess-pack" "$RUNNER_TEMP/chess-package"
+          mkdir -p "$RUNNER_TEMP/zchess-pack"
+          node scripts/prepare-cli-package.mjs "$RUNNER_TEMP/zchess-package"
+          npm pack --json --pack-destination "$RUNNER_TEMP/zchess-pack" "$RUNNER_TEMP/zchess-package"
           VERSION="$(node -p "require('./apps/cli/package.json').version")"
-          npm install --prefix "$RUNNER_TEMP/chess-cli-install" --no-audit --no-fund "$RUNNER_TEMP/chess-pack/zchess-${VERSION}.tgz"
-          node scripts/smoke-installed-cli.mjs "$RUNNER_TEMP/chess-cli-install/node_modules/.bin/chess"
-          node scripts/generate-homebrew-formula.mjs 0.0.0 https://registry.npmjs.org/zchess/-/zchess-0.0.0.tgz "$(printf '0%.0s' {1..64})" "$RUNNER_TEMP/chess-cli.rb"
-          ruby -c "$RUNNER_TEMP/chess-cli.rb"
-      - run: pnpm --filter @chess/web exec playwright install --with-deps chromium
+          npm install --prefix "$RUNNER_TEMP/zchess-cli-install" --no-audit --no-fund "$RUNNER_TEMP/zchess-pack/zchess-${VERSION}.tgz"
+          node scripts/smoke-installed-cli.mjs "$RUNNER_TEMP/zchess-cli-install/node_modules/.bin/chess"
+          node scripts/generate-homebrew-formula.mjs 0.0.0 https://registry.npmjs.org/zchess/-/zchess-0.0.0.tgz "$(printf '0%.0s' {1..64})" "$RUNNER_TEMP/zchess.rb"
+          ruby -c "$RUNNER_TEMP/zchess.rb"
+      - run: pnpm --filter @zchess/web exec playwright install --with-deps chromium
       - run: pnpm test
       - uses: actions/upload-artifact@v4
         if: always()

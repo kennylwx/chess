@@ -24,7 +24,7 @@ importers:
         specifier: 19.0.1
         version: 19.0.1
     devDependencies:
-      '@chess/chess':
+      '@zchess/chess':
         specifier: workspace:*
         version: link:../../packages/chess
       '@types/node':
@@ -38,7 +38,7 @@ importers:
 
   apps/web:
     dependencies:
-      '@chess/chess':
+      '@zchess/chess':
         specifier: workspace:*
         version: link:../../packages/chess
       stockfish:

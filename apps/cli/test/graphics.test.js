@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Chess } from '@chess/chess';
+import { Chess } from '@zchess/chess';
 import { boardSvg, renderGraphics, supportsGraphics } from '../dist/graphics.js';
 
 test('enables images in Ghostty but keeps redirected output and unsupported terminals as text', () => {

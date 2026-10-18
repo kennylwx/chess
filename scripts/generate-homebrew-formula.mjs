@@ -5,9 +5,9 @@ if (!/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(version ?? '') || !/^https:\/\/registry
   throw new Error('Usage: node generate-homebrew-formula.mjs VERSION NPM_TARBALL_URL SHA256 OUTPUT');
 }
 
-const formula = `class ChessCli < Formula
+const formula = `class Zchess < Formula
   desc "Play terminal chess against the included Stockfish engine"
-  homepage "https://github.com/kennylwx/chess"
+  homepage "https://github.com/kennylwx/zchess"
   url "${tarball}"
   sha256 "${sha256}"
   license "MIT"

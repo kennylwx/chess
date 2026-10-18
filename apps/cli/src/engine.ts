@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { createInterface } from 'node:readline';
-import { Chess } from '@chess/chess';
+import { Chess } from '@zchess/chess';
 
 const require = createRequire(import.meta.url);
 const stockfish = require('stockfish') as { findEngine(flavor: string): string };

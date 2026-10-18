@@ -25,7 +25,7 @@ const npmResponse = await fetch(`https://registry.npmjs.org/-/npm/v1/oidc/token/
   signal: AbortSignal.timeout(30_000),
 });
 if (!npmResponse.ok) {
-  throw new Error(`npm rejected this workflow as a trusted publisher (HTTP ${npmResponse.status}). First publish zchess from your npm account, then configure its trusted publisher for kennylwx/chess, release.yml, and production.`);
+  throw new Error(`npm rejected this workflow as a trusted publisher (HTTP ${npmResponse.status}). First publish zchess from your npm account, then configure its trusted publisher for kennylwx/zchess, release.yml, and production.`);
 }
 
 console.log('npm trusted publisher exchange succeeded.');

@@ -1,10 +1,10 @@
-import { Chess, START_FEN, squareName, type Move } from '@chess/chess';
-import { illegalMoveReason, moveHistory, modelInput, suggestMoves, undoTurn, type InputIntent } from '@chess/chess/interaction';
-import piecePaths from '@chess/chess/pieces';
+import { Chess, START_FEN, squareName, type Move } from '@zchess/chess';
+import { illegalMoveReason, moveHistory, modelInput, suggestMoves, undoTurn, type InputIntent } from '@zchess/chess/interaction';
+import piecePaths from '@zchess/chess/pieces';
 import { engineMove } from './engine.js';
 
 declare global { interface ImportMeta { readonly env: Record<string, string | undefined> } }
-const API = import.meta.env.VITE_CHESS_SERVER_URL || (import.meta.env.PROD ? '' : 'http://localhost:8000');
+const API = import.meta.env.VITE_ZCHESS_SERVER_URL || (import.meta.env.PROD ? '' : 'http://localhost:8000');
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 let chess = new Chess();
 let human: 'w' | 'b' = 'w';
@@ -22,14 +22,20 @@ let selectedStrength = 1;
 let selectedSide: 'w' | 'b' | 'random' = 'w';
 let currentPage: 'home' | 'setup' | 'side' | 'load' | 'game' | 'exit' = 'home';
 interface SavedGame { id: string; updatedAt: string; elo: number; color: 'w' | 'b'; startFen: string; moves: string[] }
-const STORAGE_KEY = 'chess.savedGames.v1';
+const STORAGE_KEY = 'zchess.savedGames.v1';
+const LEGACY_STORAGE_KEY = 'chess.savedGames.v1';
 const strengths = [
   ['Beginner', 1320], ['Intermediate', 1500], ['Advanced', 1800],
   ['Expert', 2200], ['Master', 3190], ['Custom ELO', null],
 ] as const;
 function readGames(): SavedGame[] {
   try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    let saved = localStorage.getItem(STORAGE_KEY);
+    if (saved === null) {
+      saved = localStorage.getItem(LEGACY_STORAGE_KEY) ?? '[]';
+      if (saved !== '[]') localStorage.setItem(STORAGE_KEY, saved);
+    }
+    const parsed: unknown = JSON.parse(saved);
     return Array.isArray(parsed) ? parsed.filter((game): game is SavedGame =>
       typeof game?.id === 'string' && typeof game?.startFen === 'string' && Array.isArray(game?.moves)) : [];
   } catch { return []; }

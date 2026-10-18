@@ -1,6 +1,6 @@
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
-import { Chess, START_FEN } from '@chess/chess';
+import { Chess, START_FEN } from '@zchess/chess';
 import { modelInput } from './input.js';
 import { ChessServerClient } from './api.js';
 import { render } from './ui.js';
@@ -19,7 +19,7 @@ Usage: chess [--elo 1500] [--color white|black] [--fen FEN]
 Run "chess" with no options to open the Play / Load game menu.
 Moves accept UCI (e2e4), SAN (Nf3), or free text ("move the queen up by 1").
 Stockfish is included and runs locally. Only free text requires the Chess server.
-Games are saved automatically in ~/.local/share/chess/games.sqlite.
+Games are saved automatically in ~/.local/share/zchess/games.sqlite.
 Commands: /fen, /fen <position>, /undo, /help, /back, /quit`;
 
 export function commandHelp(): string {
@@ -89,7 +89,7 @@ export async function run(args: string[]): Promise<void> {
         config = choice;
       }
       if (config) {
-        const again = await playGame(config, { graphics, depth, serverUrl: get('--server', process.env.CHESS_SERVER_URL || 'http://localhost:8000')!, store, sharedScreen: interactiveMenu });
+        const again = await playGame(config, { graphics, depth, serverUrl: get('--server', process.env.ZCHESS_SERVER_URL || 'http://localhost:8000')!, store, sharedScreen: interactiveMenu });
         if (again && config.saved) returnToSavedGames = true;
         if (direct || !again) keepGoing = false;
       }
@@ -108,7 +108,7 @@ async function mainMenu(store: GameStore, screen: MenuScreen, openSavedGames = f
         if (game) return game;
         continue;
       }
-      screen.draw('CHESS  /  LOCAL STOCKFISH', '  1  Play\n  2  Load a saved game\n  3  Quit', '');
+      screen.draw('ZCHESS  /  LOCAL STOCKFISH', '  1  Play\n  2  Load a saved game\n  3  Quit', '');
       const choice = await menuKey('Select › ', ['1', '2', '3']);
       if (choice === 'q') return 'quit';
       if (choice === 'b') continue;

@@ -1,10 +1,10 @@
 {
-  "name": "@chess/web",
+  "name": "@zchess/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "dependencies": {
-    "@chess/chess": "workspace:*",
+    "@zchess/chess": "workspace:*",
     "stockfish": "19.0.1"
   },
   "devDependencies": {

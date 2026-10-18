@@ -1,4 +1,4 @@
-# Chess CLI
+# ZChess CLI
 
 Play chess against the Stockfish engine from your terminal. The published
 package includes the CLI and installs Stockfish automatically.
@@ -10,12 +10,12 @@ chess
 
 Requires Node.js 22.13 or newer. The menu lets you choose a skill level and
 color, or load a saved game. Games are saved in
-`~/.local/share/chess/games.sqlite`.
+`~/.local/share/zchess/games.sqlite`.
 
 You can also install with Homebrew from a release:
 
 ```sh
-brew install --formula https://github.com/kennylwx/chess/releases/latest/download/chess-cli.rb
+brew install --formula https://github.com/kennylwx/zchess/releases/latest/download/zchess.rb
 ```
 
 Stockfish runs locally. Plain-English move descriptions need the Chess server;

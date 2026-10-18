@@ -1,4 +1,4 @@
-import type { Chess } from '@chess/chess';
+import type { Chess } from '@zchess/chess';
 
 const PIECES: Record<string, string> = {
   K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟',

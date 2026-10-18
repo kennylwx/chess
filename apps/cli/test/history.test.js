@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Chess, START_FEN } from '@chess/chess';
+import { Chess, START_FEN } from '@zchess/chess';
 import { moveHistory, undoTurn } from '../dist/history.js';
 
 test('shows numbered SAN in a single row and updates after undo', () => {

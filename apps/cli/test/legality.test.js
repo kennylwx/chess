@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Chess } from '@chess/chess';
+import { Chess } from '@zchess/chess';
 import { illegalMoveReason } from '../dist/legality.js';
 import { modelInput } from '../dist/input.js';
 

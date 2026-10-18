@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Chess } from '@chess/chess';
+import { Chess } from '@zchess/chess';
 import { modelInput } from '../dist/input.js';
 import { ResolutionError } from '../dist/api.js';
 import { suggestMoves } from '../dist/suggestions.js';

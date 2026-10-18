@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Chess } from '@chess/chess';
-import { modelInput } from '@chess/chess/interaction';
+import { Chess } from '@zchess/chess';
+import { modelInput } from '@zchess/chess/interaction';
 
 test('commands require a slash while plain words are treated as move descriptions', async () => {
   const chess = new Chess();

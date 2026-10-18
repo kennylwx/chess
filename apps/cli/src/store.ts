@@ -18,7 +18,7 @@ export interface SavedGame {
 export class GameStore {
   private readonly db: DatabaseSync;
 
-  constructor(path = process.env.CHESS_DB_PATH || join(process.env.XDG_DATA_HOME || join(homedir(), '.local', 'share'), 'chess', 'games.sqlite')) {
+  constructor(path = process.env.ZCHESS_DB_PATH || join(process.env.XDG_DATA_HOME || join(homedir(), '.local', 'share'), 'zchess', 'games.sqlite')) {
     mkdirSync(dirname(path), { recursive: true });
     this.db = new DatabaseSync(path);
     this.db.exec(`

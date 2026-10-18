@@ -43,7 +43,15 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          token: ${{ secrets.GH_PAT }}
+          token: ${{ secrets.GH_PAT || github.token }}
+      - name: Verify release automation token
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          if [ -z "$GH_PAT" ]; then
+            echo "GH_PAT is missing. Add it under Settings > Secrets and variables > Actions > Repository secrets so this job can create the release PR and trigger publishing after merge." >&2
+            exit 1
+          fi
       - uses: pnpm/action-setup@v4
         with:
           version: 10.12.4
@@ -68,11 +76,11 @@ jobs:
         env:
           VERSION: ${{ steps.release.outputs.version }}
         run: |
-          node scripts/prepare-cli-package.mjs "$RUNNER_TEMP/chess-package"
-          mkdir -p "$RUNNER_TEMP/chess-pack"
-          npm pack --json --pack-destination "$RUNNER_TEMP/chess-pack" "$RUNNER_TEMP/chess-package"
-          npm install --prefix "$RUNNER_TEMP/chess-cli-install" --no-audit --no-fund "$RUNNER_TEMP/chess-pack/zchess-${VERSION}.tgz"
-          node scripts/smoke-installed-cli.mjs "$RUNNER_TEMP/chess-cli-install/node_modules/.bin/chess"
+          node scripts/prepare-cli-package.mjs "$RUNNER_TEMP/zchess-package"
+          mkdir -p "$RUNNER_TEMP/zchess-pack"
+          npm pack --json --pack-destination "$RUNNER_TEMP/zchess-pack" "$RUNNER_TEMP/zchess-package"
+          npm install --prefix "$RUNNER_TEMP/zchess-cli-install" --no-audit --no-fund "$RUNNER_TEMP/zchess-pack/zchess-${VERSION}.tgz"
+          node scripts/smoke-installed-cli.mjs "$RUNNER_TEMP/zchess-cli-install/node_modules/.bin/chess"
       - name: Create a version-bump pull request
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
@@ -114,7 +122,7 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          token: ${{ secrets.GH_PAT }}
+          token: ${{ secrets.GH_PAT || github.token }}
       - uses: pnpm/action-setup@v4
         with:
           version: 10.12.4
@@ -149,11 +157,11 @@ jobs:
         env:
           VERSION: ${{ steps.release.outputs.version }}
         run: |
-          node scripts/prepare-cli-package.mjs "$RUNNER_TEMP/chess-package"
-          mkdir -p "$RUNNER_TEMP/chess-pack"
-          npm pack --json --pack-destination "$RUNNER_TEMP/chess-pack" "$RUNNER_TEMP/chess-package"
-          npm install --prefix "$RUNNER_TEMP/chess-cli-install" --no-audit --no-fund "$RUNNER_TEMP/chess-pack/zchess-${VERSION}.tgz"
-          node scripts/smoke-installed-cli.mjs "$RUNNER_TEMP/chess-cli-install/node_modules/.bin/chess"
+          node scripts/prepare-cli-package.mjs "$RUNNER_TEMP/zchess-package"
+          mkdir -p "$RUNNER_TEMP/zchess-pack"
+          npm pack --json --pack-destination "$RUNNER_TEMP/zchess-pack" "$RUNNER_TEMP/zchess-package"
+          npm install --prefix "$RUNNER_TEMP/zchess-cli-install" --no-audit --no-fund "$RUNNER_TEMP/zchess-pack/zchess-${VERSION}.tgz"
+          node scripts/smoke-installed-cli.mjs "$RUNNER_TEMP/zchess-cli-install/node_modules/.bin/chess"
       - name: Create and push release tag
         env:
           VERSION: ${{ steps.release.outputs.version }}
@@ -178,16 +186,16 @@ jobs:
           else
             TAG="$RELEASE_CHANNEL"
             if [ "$RELEASE_CHANNEL" = production ]; then TAG=latest; fi
-            npm publish "$RUNNER_TEMP/chess-package" --provenance --access public --tag "$TAG"
+            npm publish "$RUNNER_TEMP/zchess-package" --provenance --access public --tag "$TAG"
           fi
       - name: Prepare Homebrew formula
         if: steps.release.outputs.channel == 'production'
         run: |
           VERSION="${{ steps.release.outputs.version }}"
           TARBALL="$(npm view "zchess@${VERSION}" dist.tarball)"
-          curl --fail --location "$TARBALL" --output "$RUNNER_TEMP/chess-cli.tgz"
-          SHA256="$(shasum -a 256 "$RUNNER_TEMP/chess-cli.tgz" | cut -d ' ' -f 1)"
-          node scripts/generate-homebrew-formula.mjs "$VERSION" "$TARBALL" "$SHA256" "$RUNNER_TEMP/chess-cli.rb"
+          curl --fail --location "$TARBALL" --output "$RUNNER_TEMP/zchess-cli.tgz"
+          SHA256="$(shasum -a 256 "$RUNNER_TEMP/zchess-cli.tgz" | cut -d ' ' -f 1)"
+          node scripts/generate-homebrew-formula.mjs "$VERSION" "$TARBALL" "$SHA256" "$RUNNER_TEMP/zchess.rb"
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
@@ -196,11 +204,11 @@ jobs:
         run: |
           if gh release view "v${VERSION}" >/dev/null 2>&1; then
             if [ "$RELEASE_CHANNEL" = production ]; then
-              gh release upload "v${VERSION}" "$RUNNER_TEMP/chess-cli.rb" --clobber
+              gh release upload "v${VERSION}" "$RUNNER_TEMP/zchess.rb" --clobber
             fi
             echo "GitHub release v${VERSION} already exists."
           elif [ "$RELEASE_CHANNEL" = production ]; then
-            gh release create "v${VERSION}" "$RUNNER_TEMP/chess-cli.rb" --title "Chess CLI v${VERSION}" --generate-notes
+            gh release create "v${VERSION}" "$RUNNER_TEMP/zchess.rb" --title "ZChess CLI v${VERSION}" --generate-notes
           else
-            gh release create "v${VERSION}" --title "Chess CLI v${VERSION} (${RELEASE_CHANNEL})" --generate-notes --prerelease
+            gh release create "v${VERSION}" --title "ZChess CLI v${VERSION} (${RELEASE_CHANNEL})" --generate-notes --prerelease
           fi

@@ -1,4 +1,4 @@
-import { Chess } from '@chess/chess';
+import { Chess } from '@zchess/chess';
 
 export function engineMove(fen: string, elo: number, signal: AbortSignal): Promise<string> {
   signal.throwIfAborted();

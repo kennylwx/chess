@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
-import type { Chess } from '@chess/chess';
-import piecesData from '@chess/chess/pieces' with { type: 'json' };
+import type { Chess } from '@zchess/chess';
+import piecesData from '@zchess/chess/pieces' with { type: 'json' };
 
 const require = createRequire(import.meta.url);
 const pieces = piecesData as Record<string, string>;
