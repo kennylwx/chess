@@ -9,6 +9,7 @@ export type InputIntent =
   | { type:'quit' }
   | { type:'help' }
   | { type:'undo' }
+  | { type:'back' }
   | { type:'show-fen' }
   | { type:'load-fen'; value:string }
   | { type:'move'; value:string; source:'notation'|'jev'; fen?:string; explanation?:string };
@@ -18,11 +19,13 @@ export async function modelInput(raw:string, chess:Chess, server?:MoveResolver):
   const text = String(raw).trim();
   const lower = text.toLowerCase();
   if (!text) return { type: 'empty' };
-  if (/^(quit|exit|q)$/.test(lower)) return { type: 'quit' };
-  if (/^(help|\?)$/.test(lower)) return { type: 'help' };
-  if (/^(undo|take ?back)$/.test(lower)) return { type: 'undo' };
-  if (/^(fen|position)$/.test(lower)) return { type: 'show-fen' };
-  if (lower.startsWith('fen ')) return { type: 'load-fen', value: text.slice(4).trim() };
+  if (/^\/(quit|exit)$/.test(lower)) return { type: 'quit' };
+  if (lower === '/help') return { type: 'help' };
+  if (lower === '/undo') return { type: 'undo' };
+  if (/^\/(back|menu)$/.test(lower)) return { type: 'back' };
+  if (/^\/(fen|position)$/.test(lower)) return { type: 'show-fen' };
+  if (/^\/(fen|position)\s+/.test(lower)) return { type: 'load-fen', value: text.replace(/^\/(?:fen|position)\s+/i, '').trim() };
+  if (lower.startsWith('/')) throw new Error(`Unknown command: ${text}. Type /help to see commands.`);
 
   const legal = chess.moves();
   const normalized = text;

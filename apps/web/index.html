@@ -13,7 +13,7 @@
     <div class="menu-prompt"><span>❯</span><span id="menu-hint">Press 1 or 2 · B back · Q quit</span></div>
   </section>
   <div id="game" hidden>
-  <div class="game-bar"><button id="menu-button" type="button">← B Menu</button><span id="game-label"></span><button id="undo" type="button" title="Undo your last turn (Ctrl+U)">↶ Ctrl+U Undo</button></div>
+  <div class="game-bar"><button id="menu-button" type="button">← B Menu</button><span id="game-label"></span><button id="undo" type="button" title="Undo your last turn">↶ Undo</button></div>
   <section id="screen" aria-label="Chess game">
     <div class="board-heading"><span id="turn">WHITE TO MOVE</span><span id="player">YOU ARE WHITE</span></div>
     <div id="board" aria-label="Chessboard"></div>
@@ -25,7 +25,7 @@
     <button id="retry" type="button" hidden>Retry Stockfish</button>
   </section>
   <form id="command-form"><label for="command" class="prompt">❯<span class="sr-only">Your move or command</span></label><input id="command" autofocus autocomplete="off" spellcheck="false" placeholder="e4, Nf3, or describe your move…"><button id="submit" type="submit">Enter ↵</button></form>
-  <footer><span>e4 · e2e4 · describe a move</span><button id="help" type="button">help / fen / undo / B / Q</button></footer>
+  <footer><span>e4 · e2e4 · describe a move</span><button id="help" type="button">/help /fen /undo /back /quit</button></footer>
   </div>
 </main>
 <script type="module" src="/src/main.ts"></script>

@@ -45,9 +45,11 @@ test('fixed board updates do not reserve new lines or scroll the terminal', () =
   assert.match(output, /C=1,q=2/);
 });
 
-test('fits the image into a square terminal footprint', () => {
+test('compensates for the terminal cell width so board squares render square', () => {
   const output = renderGraphics(new Chess(), 'w', null);
   const placement = output.match(/c=(\d+),r=(\d+)/);
   assert.ok(placement);
-  assert.equal(Number(placement[1]), Number(placement[2]) * 2);
+  const columns = Number(placement[1]);
+  const rows = Number(placement[2]);
+  assert.ok(columns / rows >= 2.1 && columns / rows <= 2.25);
 });

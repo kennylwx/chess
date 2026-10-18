@@ -198,13 +198,13 @@ async function executeMove(intent: Extract<InputIntent, {type:'move'}>, version:
 async function submitCommand(raw: string): Promise<void> {
   const input = raw.trim(); if (!input || busy) return;
   const lower = input.toLowerCase();
-  if (lower === 'help' || lower === '?') { message('Enter SAN or UCI, or describe a move. Ctrl+U undoes. Commands: fen, fen <position>, B/back, Q/quit.'); return; }
-  if (lower === 'q' || lower === 'quit' || lower === 'exit') { gameVersion++; controller?.abort(); busy = false; showPage('exit'); return; }
-  if (lower === 'b' || lower === 'new' || lower === 'back') { gameVersion++; controller?.abort(); busy = false; showPage('home'); return; }
-  if (lower === 'undo' || lower === 'take back') { takeBack(); return; }
-  if (lower === 'fen' || lower === 'position') { message(chess.fen()); return; }
-  if (lower.startsWith('fen ')) {
-    try { chess.load(input.slice(4).trim()); startFen = chess.fen(); last=[]; selected=null; saveGame(); message('Position loaded.'); }
+  if (lower === '/help') { message('Commands: /help, /undo, /fen, /fen <position>, /back, /quit. Plain text is treated as a move.'); return; }
+  if (lower === '/quit' || lower === '/exit') { gameVersion++; controller?.abort(); busy = false; showPage('exit'); return; }
+  if (lower === '/back' || lower === '/menu') { gameVersion++; controller?.abort(); busy = false; showPage('home'); return; }
+  if (lower === '/undo') { takeBack(); return; }
+  if (lower === '/fen' || lower === '/position') { message(chess.fen()); return; }
+  if (/^\/(fen|position)\s+/.test(lower)) {
+    try { chess.load(input.replace(/^\/(?:fen|position)\s+/i, '').trim()); startFen = chess.fen(); last=[]; selected=null; saveGame(); message('Position loaded.'); }
     catch { message('Invalid FEN position.', true); }
     render(); return;
   }
@@ -220,7 +220,8 @@ async function submitCommand(raw: string): Promise<void> {
     if (version !== gameVersion) return;
     if (intent.type === 'undo') { busy = false; phase = null; takeBack(); return; }
     if (intent.type === 'show-fen') { busy=false; phase=null; message(chess.fen()); render(); return; }
-    if (intent.type === 'help') { busy=false; phase=null; message('Enter exact SAN or UCI, or describe a move. Ctrl+U undoes.'); render(); return; }
+    if (intent.type === 'help') { busy=false; phase=null; message('Commands: /help, /undo, /fen, /fen <position>, /back, /quit. Plain text is treated as a move.'); render(); return; }
+    if (intent.type === 'back') { busy=false; phase=null; gameVersion++; showPage('home'); return; }
     if (intent.type !== 'move') { busy=false; phase=null; render(); return; }
     await executeMove(intent, version);
   } catch (error) {
@@ -268,10 +269,9 @@ $('next').addEventListener('click', () => {
 document.querySelectorAll<HTMLButtonElement>('[data-side]').forEach(button => button.addEventListener('click', () => chooseSide(button.dataset.side as typeof selectedSide)));
 $('start').addEventListener('click', resetGame);
 $('retry').addEventListener('click', () => { if (failedFen && failedFen === chess.fen()) void playEngine(gameVersion); });
-$('help').addEventListener('click', () => message('Enter e4, Nf3, or UCI. Ctrl+U undoes. Commands: fen, fen <position>, B/back, Q/quit.'));
+$('help').addEventListener('click', () => message('Commands: /help, /undo, /fen, /fen <position>, /back, /quit. Plain text is treated as a move.'));
 document.addEventListener('keydown', event => {
   if (currentPage === 'game') {
-    if (event.ctrlKey && event.key.toLowerCase() === 'u') { event.preventDefault(); takeBack(); }
     if (event.key === 'Escape') { event.preventDefault(); gameVersion++; controller?.abort(); busy = false; showPage('home'); }
     return;
   }

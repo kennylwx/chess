@@ -42,12 +42,14 @@ export function boardPng(chess: Chess, perspective: 'w' | 'b', last: number[] | 
 }
 
 export function renderGraphics(chess: Chess, perspective: 'w' | 'b', last: number[] | null, fixed = false): string {
-  // A typical terminal cell is about twice as tall as it is wide. Reserve a
-  // 2:1 column/row box so the square PNG and its pieces keep their proportions.
-  const availableRows = Math.max(1, (process.stdout.rows || 40) - 7);
+  // The supplied Ghostty screenshot shows that this terminal's cells are a
+  // little narrower than the usual 2:1 estimate. Use a 2.2:1 placement so the
+  // rendered board squares do not appear tall.
+  const columnsPerRow = 2.2;
+  const availableRows = Math.max(1, (process.stdout.rows || 40) - (fixed ? 8 : 7));
   const availableColumns = Math.max(2, (process.stdout.columns || 80) - 2);
-  const rows = Math.max(1, Math.min(32, availableRows, Math.floor(availableColumns / 2)));
-  const columns = rows * 2;
+  const rows = Math.max(1, Math.min(32, availableRows, Math.floor(availableColumns / columnsPerRow)));
+  const columns = Math.min(availableColumns, Math.round(rows * columnsPerRow));
   const data = boardPng(chess, perspective, last).toString('base64');
   // Reserve room first: images anchored near the bottom must not cover the prompt.
   let output = `\x1b_Ga=d,d=I,i=${IMAGE_ID},q=2;\x1b\\`;
