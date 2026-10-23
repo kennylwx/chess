@@ -51,7 +51,7 @@ test('negative, absent and mismatched responses fall back to text', async () => 
 });
 
 test('text, redirected input and multiplexers do not receive probes', async () => {
-  for (const [mode, tty, env] of [['text', true, {}], ['auto', false, {}], ['auto', true, {TMUX: 'x'}], ['auto', true, {STY: 'x'}], ['auto', true, {TERM: 'dumb'}]]) {
+  for (const [mode, tty, env] of [['ascii', true, {TERM: 'xterm-kitty'}], ['text', true, {}], ['auto', false, {}], ['auto', true, {TMUX: 'x'}], ['auto', true, {STY: 'x'}], ['auto', true, {TERM: 'dumb'}]]) {
     const t = terminal(null, {tty});
     assert.equal(await detectGraphics(mode, t.input, t.output, env), false);
     assert.equal(t.written(), '');

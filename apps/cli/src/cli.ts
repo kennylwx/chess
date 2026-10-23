@@ -1,3 +1,4 @@
+import { checkForUpdate, type UpdateNotice } from './update.js';
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 import { Chess, START_FEN } from '@zchess/chess';
@@ -15,7 +16,7 @@ import type { Key } from 'node:readline';
 const HELP = `chess — terminal chess
 
 Usage: chess [--elo 1500] [--color white|black] [--fen FEN]
-             [--server URL] [--depth 12] [--graphics auto|kitty|text]
+             [--server URL] [--depth 12] [--graphics auto|kitty|text|ascii]
 
 Run "chess" with no options to open the Play / Load game menu.
 Moves accept UCI (e2e4), SAN (Nf3), or free text ("move the queen up by 1").
@@ -57,23 +58,27 @@ const ELO_PRESETS = [
 ];
 interface GameConfig { elo: number; human: 'w' | 'b'; saved?: SavedGame; fen?: string }
 
-export async function run(args: string[]): Promise<void> {
+export async function run(args: string[], installation?: { version: string; homebrew?: boolean }): Promise<void> {
   if (args.includes('--help') || args.includes('-h')) { console.log(HELP); return; }
   const get = (name: string, fallback: string | undefined): string | undefined => {
     const index = args.indexOf(name);
     return index < 0 ? fallback : (args[index + 1] ?? fallback);
   };
   const graphics = get('--graphics', 'auto') as GraphicsMode;
-  if (!['auto', 'kitty', 'text'].includes(graphics)) throw new Error('Graphics must be auto, kitty, or text.');
+  if (!['auto', 'kitty', 'text', 'ascii'].includes(graphics)) throw new Error('Graphics must be auto, kitty, text, or ascii.');
   const depth = Number(get('--depth', '12'));
   if (!Number.isInteger(depth) || depth < 1 || depth > 30) throw new Error('Depth must be an integer from 1 to 30.');
   let cellAspect = 2;
   const useGraphics = await detectGraphics(graphics, stdin, stdout, process.env, 300, ratio => { cellAspect = ratio; });
+
+  const update = installation && stdin.isTTY && stdout.isTTY && process.env.ZCHESS_NO_UPDATE_CHECK !== '1'
+    ? await checkForUpdate(installation.version, { homebrew: installation.homebrew }) : undefined;
   const store = new GameStore(get('--db', undefined));
   const direct = args.some(arg => arg.startsWith('--'));
   const interactiveMenu = !direct && stdin.isTTY && stdout.isTTY;
   const menuScreen = interactiveMenu ? new MenuScreen(true) : undefined;
   menuScreen?.open();
+  if (update && !interactiveMenu) console.log(`Update available: ${installation!.version} → ${update.version}\nRun: ${update.command}`);
 
   try {
     let keepGoing = true;
@@ -86,13 +91,13 @@ export async function run(args: string[]): Promise<void> {
         config = { elo, human: get('--color', 'white')!.toLowerCase().startsWith('b') ? 'b' : 'w', fen: get('--fen', undefined) };
         keepGoing = false;
       } else {
-        const choice = await mainMenu(store, menuScreen!, returnToSavedGames);
+        const choice = await mainMenu(store, menuScreen!, returnToSavedGames, update, installation?.version);
         returnToSavedGames = false;
         if (choice === 'quit') break;
         config = choice;
       }
       if (config) {
-        const again = await playGame(config, { useGraphics, cellAspect, depth, serverUrl: get('--server', process.env.ZCHESS_SERVER_URL || 'http://localhost:8000')!, store, sharedScreen: interactiveMenu });
+        const again = await playGame(config, { useGraphics, ascii: graphics === 'ascii', cellAspect, depth, serverUrl: get('--server', process.env.ZCHESS_SERVER_URL || 'http://localhost:8000')!, store, sharedScreen: interactiveMenu });
         if (again && config.saved) returnToSavedGames = true;
         if (direct || !again) keepGoing = false;
       }
@@ -100,7 +105,7 @@ export async function run(args: string[]): Promise<void> {
   } finally { menuScreen?.close(); store.close(); }
 }
 
-async function mainMenu(store: GameStore, screen: MenuScreen, openSavedGames = false): Promise<GameConfig | 'quit'> {
+async function mainMenu(store: GameStore, screen: MenuScreen, openSavedGames = false, update?: UpdateNotice, installed?: string): Promise<GameConfig | 'quit'> {
   const rl = createInterface({ input: stdin, output: stdout });
   try {
     while (true) {
@@ -111,7 +116,8 @@ async function mainMenu(store: GameStore, screen: MenuScreen, openSavedGames = f
         if (game) return game;
         continue;
       }
-      screen.draw('ZCHESS  /  LOCAL STOCKFISH', '  1  Play\n  2  Load a saved game\n  3  Quit', '');
+      const notice = update ? `\n\nUpdate available: ${installed} → ${update.version}\nRun: ${update.command}` : '';
+      screen.draw('ZCHESS  /  LOCAL STOCKFISH', '  1  Play\n  2  Load a saved game\n  3  Quit' + notice, '');
       const choice = await menuKey('Select › ', ['1', '2', '3']);
       if (choice === 'q') return 'quit';
       if (choice === 'b') continue;
@@ -238,7 +244,7 @@ function rawPrompt<T>(prompt: string, onKey: (text: string, key: Key, finish: (v
   });
 }
 
-async function playGame(config: GameConfig, options: { useGraphics: boolean; cellAspect: number; depth: number; serverUrl: string; store: GameStore; sharedScreen: boolean }): Promise<boolean> {
+async function playGame(config: GameConfig, options: { useGraphics: boolean; ascii: boolean; cellAspect: number; depth: number; serverUrl: string; store: GameStore; sharedScreen: boolean }): Promise<boolean> {
   const { elo, human, saved } = config;
   let startFen = saved?.startFen ?? config.fen ?? START_FEN;
   const chess = new Chess(startFen);
@@ -272,7 +278,7 @@ async function playGame(config: GameConfig, options: { useGraphics: boolean; cel
         useGraphics = false;
         board = '';
       }
-      if (!useGraphics) board = render(chess, { perspective: human, last, compact: screen.active && (stdout.rows || 40) < 36 });
+      if (!useGraphics) board = render(chess, { ascii: options.ascii, perspective: human, last, compact: screen.active && (stdout.rows || 40) < 36 });
     }
     screen.draw(header, board, notice, showingHelp ? '' : moveHistory(chess, Math.max(1, (stdout.columns || 80) - 1)));
   };

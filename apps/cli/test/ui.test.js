@@ -32,3 +32,26 @@ test('board labels use default foreground while colored squares retain piece con
   assert.match(output, /48;5;\d+;38;5;231m/);
   assert.match(output, /48;5;\d+;38;5;16m/);
 });
+
+
+test('ASCII boards preserve piece sides, orientation, captures and compact layout', () => {
+  const chess = new Chess();
+  for (const color of [false, true]) {
+    for (const compact of [false, true]) {
+      const white = render(chess, { ascii: true, color, compact });
+      const black = render(chess, { ascii: true, color, compact, perspective: 'b' });
+      assert.match(white, /^[\x00-\x7f]*$/);
+      assert.match(black, /^[\x00-\x7f]*$/);
+      assert.ok(white.indexOf('r') < white.indexOf('R'));
+      assert.ok(black.indexOf('R') < black.indexOf('r'));
+      assert.equal(white.trimEnd().split('\n').length, compact ? 12 : 28);
+    }
+  }
+  chess.play('e4'); chess.play('d5'); chess.play('exd5');
+  const captured = render(chess, { ascii: true, color: false });
+  const ranks = captured.split('\n').filter(line => line.includes('|')).join('');
+  assert.equal((ranks.match(/P/g) || []).length, 8);
+  assert.equal((ranks.match(/p/g) || []).length, 7);
+  assert.ok(captured.includes('.'));
+  assert.match(render(chess, { ascii: true, color: true, last: [28, 27] }), /48;5;107;/);
+});

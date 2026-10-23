@@ -1,6 +1,6 @@
 import { stdin, stdout } from 'node:process';
 
-export type GraphicsMode = 'auto' | 'kitty' | 'text';
+export type GraphicsMode = 'auto' | 'kitty' | 'text' | 'ascii';
 const QUERY_ID = 73192;
 
 function blocksAutoGraphics(env: NodeJS.ProcessEnv): boolean {
@@ -17,7 +17,7 @@ function blocksAutoGraphics(env: NodeJS.ProcessEnv): boolean {
 
 /** Environment variables can disable probing, but cannot prove graphics support. */
 export function supportsGraphics(mode: GraphicsMode, tty = Boolean(stdout.isTTY && stdin.isTTY), env = process.env, confirmed = false): boolean {
-  if (!tty || mode === 'text') return false;
+  if (!tty || (mode === 'text' || mode === 'ascii')) return false;
   if (mode === 'kitty') return true;
   if (blocksAutoGraphics(env)) return false;
   return confirmed;
@@ -26,7 +26,7 @@ export function supportsGraphics(mode: GraphicsMode, tty = Boolean(stdout.isTTY 
 /** Isolate protocol replies from readline. Queries do not store or display images. */
 export async function detectGraphics(mode: GraphicsMode, input = stdin, output = stdout, env = process.env, timeout = 300, onCellAspect?: (ratio: number) => void): Promise<boolean> {
   const tty = Boolean(input.isTTY && output.isTTY);
-  if (mode === 'text' || !tty || env.TMUX || env.STY || env.TERM === 'dumb' ||
+  if ((mode === 'text' || mode === 'ascii') || !tty || env.TMUX || env.STY || env.TERM === 'dumb' ||
       (mode === 'auto' && blocksAutoGraphics(env))) {
     return supportsGraphics(mode, tty, env);
   }

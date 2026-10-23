@@ -43,3 +43,19 @@ board also uses approximate proportions and depends on the terminal font.
 Help, returning to menus and exit delete the board image. If the native PNG
 renderer cannot load, play continues with the text board. A protocol response
 establishes capability, not visual correctness in every terminal/version.
+
+When you start an interactive session, Chess checks npm for a newer version and
+shows the command to install it in the main menu. Alpha installations also check
+the alpha channel; stable installations only check stable releases. Homebrew
+installations show a command to reinstall the latest release formula instead.
+The check times out after 800 ms and failures are silent, so you can still play
+offline. Set `ZCHESS_NO_UPDATE_CHECK=1` to disable it. Help and noninteractive
+sessions do not check for updates. Updates are never installed automatically.
+
+
+Unicode text boards require a terminal font containing chess symbols. The XTerm
+398 Unicode check used DejaVu Sans Mono 11; its default bitmap font showed missing
+glyph boxes. For fonts without chess symbols, use `chess --graphics ascii`.
+This disables image probing and uses uppercase `KQRBNP` for white, lowercase
+`kqrbnp` for black, and ASCII board labels/markers. It changes the board only;
+other CLI messages can still contain Unicode. Font support is not auto-detected.
