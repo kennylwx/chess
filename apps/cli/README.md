@@ -20,3 +20,11 @@ brew install --formula https://github.com/kennylwx/zchess/releases/latest/downlo
 
 Stockfish runs locally. Plain-English move descriptions need the Chess server;
 SAN and UCI moves work offline.
+
+When you start an interactive session, Chess checks npm for a newer version and
+shows the command to install it in the main menu. Alpha installations also check
+the alpha channel; stable installations only check stable releases. Homebrew
+installations show a command to reinstall the latest release formula instead.
+The check times out after 800 ms and failures are silent, so you can still play
+offline. Set `ZCHESS_NO_UPDATE_CHECK=1` to disable it. Help and noninteractive
+sessions do not check for updates. Updates are never installed automatically.

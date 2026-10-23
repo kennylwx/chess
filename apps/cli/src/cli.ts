@@ -1,3 +1,4 @@
+import { checkForUpdate, type UpdateNotice } from './update.js';
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 import { Chess, START_FEN } from '@zchess/chess';
@@ -56,7 +57,7 @@ const ELO_PRESETS = [
 ];
 interface GameConfig { elo: number; human: 'w' | 'b'; saved?: SavedGame; fen?: string }
 
-export async function run(args: string[]): Promise<void> {
+export async function run(args: string[], installation?: { version: string; homebrew?: boolean }): Promise<void> {
   if (args.includes('--help') || args.includes('-h')) { console.log(HELP); return; }
   const get = (name: string, fallback: string | undefined): string | undefined => {
     const index = args.indexOf(name);
@@ -66,11 +67,14 @@ export async function run(args: string[]): Promise<void> {
   if (!['auto', 'kitty', 'text'].includes(graphics)) throw new Error('Graphics must be auto, kitty, or text.');
   const depth = Number(get('--depth', '12'));
   if (!Number.isInteger(depth) || depth < 1 || depth > 30) throw new Error('Depth must be an integer from 1 to 30.');
+  const update = installation && stdin.isTTY && stdout.isTTY && process.env.ZCHESS_NO_UPDATE_CHECK !== '1'
+    ? await checkForUpdate(installation.version, { homebrew: installation.homebrew }) : undefined;
   const store = new GameStore(get('--db', undefined));
   const direct = args.some(arg => arg.startsWith('--'));
   const interactiveMenu = !direct && stdin.isTTY && stdout.isTTY;
   const menuScreen = interactiveMenu ? new MenuScreen(true) : undefined;
   menuScreen?.open();
+  if (update && !interactiveMenu) console.log(`Update available: ${installation!.version} → ${update.version}\nRun: ${update.command}`);
 
   try {
     let keepGoing = true;
@@ -83,7 +87,7 @@ export async function run(args: string[]): Promise<void> {
         config = { elo, human: get('--color', 'white')!.toLowerCase().startsWith('b') ? 'b' : 'w', fen: get('--fen', undefined) };
         keepGoing = false;
       } else {
-        const choice = await mainMenu(store, menuScreen!, returnToSavedGames);
+        const choice = await mainMenu(store, menuScreen!, returnToSavedGames, update, installation?.version);
         returnToSavedGames = false;
         if (choice === 'quit') break;
         config = choice;
@@ -97,7 +101,7 @@ export async function run(args: string[]): Promise<void> {
   } finally { menuScreen?.close(); store.close(); }
 }
 
-async function mainMenu(store: GameStore, screen: MenuScreen, openSavedGames = false): Promise<GameConfig | 'quit'> {
+async function mainMenu(store: GameStore, screen: MenuScreen, openSavedGames = false, update?: UpdateNotice, installed?: string): Promise<GameConfig | 'quit'> {
   const rl = createInterface({ input: stdin, output: stdout });
   try {
     while (true) {
@@ -108,7 +112,8 @@ async function mainMenu(store: GameStore, screen: MenuScreen, openSavedGames = f
         if (game) return game;
         continue;
       }
-      screen.draw('ZCHESS  /  LOCAL STOCKFISH', '  1  Play\n  2  Load a saved game\n  3  Quit', '');
+      const notice = update ? `\n\nUpdate available: ${installed} → ${update.version}\nRun: ${update.command}` : '';
+      screen.draw('ZCHESS  /  LOCAL STOCKFISH', '  1  Play\n  2  Load a saved game\n  3  Quit' + notice, '');
       const choice = await menuKey('Select › ', ['1', '2', '3']);
       if (choice === 'q') return 'quit';
       if (choice === 'b') continue;
