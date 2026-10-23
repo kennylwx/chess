@@ -5,7 +5,8 @@ import { Chess, START_FEN } from '@zchess/chess';
 import { modelInput } from './input.js';
 import { ChessServerClient } from './api.js';
 import { render } from './ui.js';
-import { renderGraphics, supportsGraphics, type GraphicsMode } from './graphics.js';
+import { clearGraphics, renderGraphics, type GraphicsMode } from './graphics.js';
+import { detectGraphics } from './terminal.js';
 import { engineMove } from './engine.js';
 import { GameScreen, MenuScreen } from './screen.js';
 import { moveHistory, undoTurn } from './history.js';
@@ -15,7 +16,7 @@ import type { Key } from 'node:readline';
 const HELP = `chess — terminal chess
 
 Usage: chess [--elo 1500] [--color white|black] [--fen FEN]
-             [--server URL] [--depth 12] [--graphics auto|kitty|text]
+             [--server URL] [--depth 12] [--graphics auto|kitty|text|ascii]
 
 Run "chess" with no options to open the Play / Load game menu.
 Moves accept UCI (e2e4), SAN (Nf3), or free text ("move the queen up by 1").
@@ -46,7 +47,7 @@ export function editGameInput(value: string, text: string, key: Key): string {
   return value;
 }
 
-const promptColor = '\x1b[38;2;190;221;173m';
+const promptColor = '\x1b[39m';
 const reset = '\x1b[0m';
 const ELO_PRESETS = [
   { label: 'Beginner', elo: 1320 },
@@ -64,9 +65,12 @@ export async function run(args: string[], installation?: { version: string; home
     return index < 0 ? fallback : (args[index + 1] ?? fallback);
   };
   const graphics = get('--graphics', 'auto') as GraphicsMode;
-  if (!['auto', 'kitty', 'text'].includes(graphics)) throw new Error('Graphics must be auto, kitty, or text.');
+  if (!['auto', 'kitty', 'text', 'ascii'].includes(graphics)) throw new Error('Graphics must be auto, kitty, text, or ascii.');
   const depth = Number(get('--depth', '12'));
   if (!Number.isInteger(depth) || depth < 1 || depth > 30) throw new Error('Depth must be an integer from 1 to 30.');
+  let cellAspect = 2;
+  const useGraphics = await detectGraphics(graphics, stdin, stdout, process.env, 300, ratio => { cellAspect = ratio; });
+
   const update = installation && stdin.isTTY && stdout.isTTY && process.env.ZCHESS_NO_UPDATE_CHECK !== '1'
     ? await checkForUpdate(installation.version, { homebrew: installation.homebrew }) : undefined;
   const store = new GameStore(get('--db', undefined));
@@ -93,7 +97,7 @@ export async function run(args: string[], installation?: { version: string; home
         config = choice;
       }
       if (config) {
-        const again = await playGame(config, { graphics, depth, serverUrl: get('--server', process.env.ZCHESS_SERVER_URL || 'http://localhost:8000')!, store, sharedScreen: interactiveMenu });
+        const again = await playGame(config, { useGraphics, ascii: graphics === 'ascii', cellAspect, depth, serverUrl: get('--server', process.env.ZCHESS_SERVER_URL || 'http://localhost:8000')!, store, sharedScreen: interactiveMenu });
         if (again && config.saved) returnToSavedGames = true;
         if (direct || !again) keepGoing = false;
       }
@@ -240,7 +244,7 @@ function rawPrompt<T>(prompt: string, onKey: (text: string, key: Key, finish: (v
   });
 }
 
-async function playGame(config: GameConfig, options: { graphics: GraphicsMode; depth: number; serverUrl: string; store: GameStore; sharedScreen: boolean }): Promise<boolean> {
+async function playGame(config: GameConfig, options: { useGraphics: boolean; ascii: boolean; cellAspect: number; depth: number; serverUrl: string; store: GameStore; sharedScreen: boolean }): Promise<boolean> {
   const { elo, human, saved } = config;
   let startFen = saved?.startFen ?? config.fen ?? START_FEN;
   const chess = new Chess(startFen);
@@ -249,7 +253,7 @@ async function playGame(config: GameConfig, options: { graphics: GraphicsMode; d
   const server = new ChessServerClient(options.serverUrl, abort.signal);
   const rl = createInterface({ input: stdin, output: stdout });
   const screen = new GameScreen(Boolean(stdout.isTTY && stdin.isTTY), stdout, !options.sharedScreen);
-  const useGraphics = supportsGraphics(options.graphics);
+  let useGraphics = options.useGraphics;
   let stopped = false;
   let redrawInput: (() => void) | undefined;
   let last: number[] | null = null;
@@ -263,11 +267,21 @@ async function playGame(config: GameConfig, options: { graphics: GraphicsMode; d
   const persist = (): void => {
     gameId = options.store.save({ elo, color: human, startFen, fen: chess.fen(), moves: chess.history.map(entry => entry.san), status: chess.status() ?? 'In progress' }, gameId);
   };
-  const draw = (): void => screen.draw(header,
-    showingHelp ? commandHelp()
-      : useGraphics ? renderGraphics(chess, human, last, screen.active)
-        : render(chess, { perspective: human, last, compact: screen.active && (stdout.rows || 40) < 36 }),
-    notice, showingHelp ? '' : moveHistory(chess, Math.max(1, (stdout.columns || 80) - 1)));
+  const draw = (): void => {
+    let board: string;
+    if (showingHelp) board = (useGraphics ? clearGraphics() : '') + commandHelp();
+    else {
+      try { board = useGraphics ? renderGraphics(chess, human, last, screen.active, options.cellAspect) : ''; }
+      catch {
+        // A missing native rasterizer must not prevent playing a text game.
+        stdout.write(clearGraphics());
+        useGraphics = false;
+        board = '';
+      }
+      if (!useGraphics) board = render(chess, { ascii: options.ascii, perspective: human, last, compact: screen.active && (stdout.rows || 40) < 36 });
+    }
+    screen.draw(header, board, notice, showingHelp ? '' : moveHistory(chess, Math.max(1, (stdout.columns || 80) - 1)));
+  };
   const takeBack = (): void => {
     notice = undoTurn(chess, human) ? 'Took back your last move and any Stockfish reply.' : 'No move to undo yet.';
     const move = chess.history.at(-1)?.move;
@@ -279,7 +293,16 @@ async function playGame(config: GameConfig, options: { graphics: GraphicsMode; d
     if (key?.ctrl && key.name === 'c') { stop(); return; }
   };
   const stop = (): void => { stopped = true; abort.abort(); search?.abort(); };
-  const resize = (): void => { if (!stopped) { draw(); redrawInput?.(); } };
+  let resizeTask: Promise<void> | undefined;
+  const resize = (): void => {
+    if (stopped || resizeTask) return;
+    resizeTask = (async () => {
+      try {
+        if (useGraphics) await detectGraphics('kitty', stdin, stdout, process.env, 300, ratio => { options.cellAspect = ratio; });
+        if (!stopped) { draw(); redrawInput?.(); }
+      } catch { /* Keep the previous geometry if the terminal stops responding. */ }
+    })().finally(() => { resizeTask = undefined; });
+  };
   const question = async (placeholder: string): Promise<string> => {
     if (!screen.active) return await rl.question(`${promptColor}${placeholder} › ${reset}`, { signal: abort.signal });
     const stream = stdin as typeof stdin & { setRawMode?: (mode: boolean) => void };
@@ -391,12 +414,14 @@ async function playGame(config: GameConfig, options: { graphics: GraphicsMode; d
     }
   } catch (error) { if (!stopped) throw error; }
   finally {
+    await resizeTask;
     returnToMenu = screen.active && !stopped;
     stdin.off('keypress', shortcut);
     stdout.off('resize', resize);
     process.off('SIGINT', stop);
     process.off('SIGTERM', stop);
     rl.close();
+    if (useGraphics) stdout.write(clearGraphics());
     screen.close();
   }
   return returnToMenu || screen.active && returnToMenuRequested;
