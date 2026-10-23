@@ -83,3 +83,29 @@ test('invalid or credential-bearing endpoint is rejected before a request', asyn
     await assert.rejects(new ChessServerClient(url).resolve('pawn to e4', new Chess()), /Invalid Chess server URL/);
   }
 });
+
+test('cancellation after headers during streaming body parsing stays cancellation', {timeout: 2000}, async t => {
+  for (const withSignal of [false, true]) {
+    const abort = new AbortController();
+    const reason = withSignal ? new Error('Caller cancelled body read') : new DOMException('Body aborted', 'AbortError');
+    let bodyController;
+    let reading;
+    const bodyReadStarted = new Promise(resolve => { reading = resolve; });
+    let sent = false;
+    const response = new Response(new ReadableStream({
+      start(controller) { bodyController = controller; },
+      pull(controller) {
+        if (!sent) { sent = true; controller.enqueue(new TextEncoder().encode('{"move":')); }
+        else reading();
+      },
+    }));
+    const fetch = t.mock.method(globalThis, 'fetch', async () => response);
+    const client = new ChessServerClient('https://chess.example', withSignal ? abort.signal : undefined);
+    const result = client.resolve('pawn to e4', new Chess());
+    await bodyReadStarted;
+    if (withSignal) abort.abort(reason);
+    bodyController.error(reason);
+    await assert.rejects(result, error => error === reason);
+    fetch.mock.restore();
+  }
+});

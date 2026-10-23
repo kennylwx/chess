@@ -43,7 +43,10 @@ export class ChessServerClient {
     }
     let body: unknown;
     try { body = await response.json(); }
-    catch { throw new ResolutionError(`Invalid Chess server response (${response.status}). Check that the configured URL serves /api/resolve`, 502); }
+    catch (error) {
+      if (this.signal?.aborted || (error instanceof Error && error.name === 'AbortError')) throw error;
+      throw new ResolutionError(`Invalid Chess server response (${response.status}). Check that the configured URL serves /api/resolve`, 502);
+    }
     if (!response.ok) {
       const detail = body && typeof body === 'object' && 'detail' in body ? body.detail : undefined;
       throw new ResolutionError(typeof detail === 'string' ? detail : `Chess server failed (${response.status})`, response.status);
