@@ -77,3 +77,23 @@ test('supports help and position commands', async ({ page }) => {
   await input.fill('/fen'); await input.press('Enter');
   await expect(page.locator('#output')).toContainText('rnbqkbnr/pppppppp');
 });
+
+test('offers playable legal suggestions when a plain-English request cannot reach the API', async ({ page }) => {
+  await page.route('**/api/resolve', route => route.abort('failed'));
+  const input = page.getByPlaceholder('e4, Nf3, or describe your move…');
+  await input.fill('move my knight to f3');
+  await input.press('Enter');
+  await expect(page.getByRole('button', { name: 'Play suggested move Nf3', exact: true })).toBeVisible();
+  await expect(page.locator('#moves')).toHaveText('Moves: —');
+  await page.getByRole('button', { name: 'Play suggested move Nf3', exact: true }).click();
+  await expect(page.locator('#moves')).toContainText('1. Nf3');
+});
+
+test('offers legal alternatives for an unmatched query', async ({ page }) => {
+  await page.route('**/api/resolve', route => route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ detail: 'No matching move' }) }));
+  const input = page.getByPlaceholder('e4, Nf3, or describe your move…');
+  await input.fill('hello there');
+  await input.press('Enter');
+  await expect(page.locator('#suggestions button')).toHaveCount(5);
+  await expect(page.locator('#moves')).toHaveText('Moves: —');
+});
