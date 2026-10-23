@@ -67,7 +67,8 @@ export async function run(args: string[]): Promise<void> {
   if (!['auto', 'kitty', 'text'].includes(graphics)) throw new Error('Graphics must be auto, kitty, or text.');
   const depth = Number(get('--depth', '12'));
   if (!Number.isInteger(depth) || depth < 1 || depth > 30) throw new Error('Depth must be an integer from 1 to 30.');
-  const useGraphics = await detectGraphics(graphics);
+  let cellAspect = 2;
+  const useGraphics = await detectGraphics(graphics, stdin, stdout, process.env, 300, ratio => { cellAspect = ratio; });
   const store = new GameStore(get('--db', undefined));
   const direct = args.some(arg => arg.startsWith('--'));
   const interactiveMenu = !direct && stdin.isTTY && stdout.isTTY;
@@ -91,7 +92,7 @@ export async function run(args: string[]): Promise<void> {
         config = choice;
       }
       if (config) {
-        const again = await playGame(config, { useGraphics, depth, serverUrl: get('--server', process.env.ZCHESS_SERVER_URL || 'http://localhost:8000')!, store, sharedScreen: interactiveMenu });
+        const again = await playGame(config, { useGraphics, cellAspect, depth, serverUrl: get('--server', process.env.ZCHESS_SERVER_URL || 'http://localhost:8000')!, store, sharedScreen: interactiveMenu });
         if (again && config.saved) returnToSavedGames = true;
         if (direct || !again) keepGoing = false;
       }
@@ -237,7 +238,7 @@ function rawPrompt<T>(prompt: string, onKey: (text: string, key: Key, finish: (v
   });
 }
 
-async function playGame(config: GameConfig, options: { useGraphics: boolean; depth: number; serverUrl: string; store: GameStore; sharedScreen: boolean }): Promise<boolean> {
+async function playGame(config: GameConfig, options: { useGraphics: boolean; cellAspect: number; depth: number; serverUrl: string; store: GameStore; sharedScreen: boolean }): Promise<boolean> {
   const { elo, human, saved } = config;
   let startFen = saved?.startFen ?? config.fen ?? START_FEN;
   const chess = new Chess(startFen);
@@ -264,7 +265,7 @@ async function playGame(config: GameConfig, options: { useGraphics: boolean; dep
     let board: string;
     if (showingHelp) board = (useGraphics ? clearGraphics() : '') + commandHelp();
     else {
-      try { board = useGraphics ? renderGraphics(chess, human, last, screen.active) : ''; }
+      try { board = useGraphics ? renderGraphics(chess, human, last, screen.active, options.cellAspect) : ''; }
       catch {
         // A missing native rasterizer must not prevent playing a text game.
         stdout.write(clearGraphics());
@@ -286,7 +287,17 @@ async function playGame(config: GameConfig, options: { useGraphics: boolean; dep
     if (key?.ctrl && key.name === 'c') { stop(); return; }
   };
   const stop = (): void => { stopped = true; abort.abort(); search?.abort(); };
-  const resize = (): void => { if (!stopped) { draw(); redrawInput?.(); } };
+  let resizeTask: Promise<void> | undefined;
+  const resize = (): void => {
+    if (stopped || resizeTask) return;
+    resizeTask = (async () => {
+      try {
+        if (useGraphics) await detectGraphics('kitty', stdin, stdout, process.env, 300, ratio => { options.cellAspect = ratio; });
+        if (!stopped) { draw(); redrawInput?.(); }
+      } catch { /* Keep the previous geometry if the terminal stops responding. */ }
+      finally { resizeTask = undefined; }
+    })();
+  };
   const question = async (placeholder: string): Promise<string> => {
     if (!screen.active) return await rl.question(`${promptColor}${placeholder} › ${reset}`, { signal: abort.signal });
     const stream = stdin as typeof stdin & { setRawMode?: (mode: boolean) => void };
@@ -398,6 +409,7 @@ async function playGame(config: GameConfig, options: { useGraphics: boolean; dep
     }
   } catch (error) { if (!stopped) throw error; }
   finally {
+    await resizeTask;
     returnToMenu = screen.active && !stopped;
     stdin.off('keypress', shortcut);
     stdout.off('resize', resize);

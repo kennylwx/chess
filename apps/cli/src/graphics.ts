@@ -38,11 +38,16 @@ export function boardPng(chess: Chess, perspective: 'w' | 'b', last: number[] | 
   return new Resvg(boardSvg(chess, perspective, last)).render().asPng();
 }
 
-export function renderGraphics(chess: Chess, perspective: 'w' | 'b', last: number[] | null, fixed = false): string {
-  // Let the terminal use its actual cell geometry to letterbox the square PNG.
-  // Kitty's c/r rectangle is a bounding box, not an assumed cell aspect ratio.
-  const rows = Math.max(1, Math.min(32, (process.stdout.rows || 40) - (fixed ? 8 : 7)));
-  const columns = Math.max(1, (process.stdout.columns || 80) - 2);
+export function renderGraphics(chess: Chess, perspective: 'w' | 'b', last: number[] | null, fixed = false, columnsPerRow = 2): string {
+  // A single placement dimension preserves PNG aspect even in terminals that
+  // stretch images when both c and r are supplied. Use measured cell pixels to
+  // select the limiting dimension and reserve the corresponding rows.
+  const availableRows = Math.max(1, Math.min(32, (process.stdout.rows || 40) - (fixed ? 8 : 7)));
+  const availableColumns = Math.max(1, (process.stdout.columns || 80) - 2);
+  const ratio = Number.isFinite(columnsPerRow) && columnsPerRow > 0 ? columnsPerRow : 2;
+  const widthLimited = availableColumns / ratio < availableRows;
+  const rows = widthLimited ? Math.ceil(availableColumns / ratio) : availableRows;
+  const placement = widthLimited ? `c=${availableColumns}` : `r=${rows}`;
   const data = boardPng(chess, perspective, last).toString('base64');
   // Reserve room first: images anchored near the bottom must not cover the prompt.
   let output = clearGraphics();
@@ -50,7 +55,7 @@ export function renderGraphics(chess: Chess, perspective: 'w' | 'b', last: numbe
   for (let offset = 0; offset < data.length; offset += 4096) {
     const chunk = data.slice(offset, offset + 4096);
     const more = offset + 4096 < data.length ? 1 : 0;
-    const control = offset === 0 ? `a=T,f=100,t=d,i=${IMAGE_ID},c=${columns},r=${rows},C=1,q=2,` : '';
+    const control = offset === 0 ? `a=T,f=100,t=d,i=${IMAGE_ID},${placement},C=1,q=2,` : '';
     output += `\x1b_G${control}m=${more};${chunk}\x1b\\`;
   }
   return output + `\x1b[${rows}B\r`;

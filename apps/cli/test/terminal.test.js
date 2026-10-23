@@ -58,10 +58,24 @@ test('text, redirected input and multiplexers do not receive probes', async () =
   }
 });
 
-test('explicit kitty override skips probing and timeout restores existing raw mode', async () => {
+test('explicit kitty override survives missing replies and restores existing raw mode', async () => {
   const t = terminal(null, {raw: true});
-  assert.equal(await detectGraphics('kitty', t.input, t.output, {}), true);
-  assert.equal(t.written(), '');
+  assert.equal(await detectGraphics('kitty', t.input, t.output, {}, 10), true);
+  assert.match(t.written(), /\x1b\[16t/);
   assert.equal(await detectGraphics('auto', t.input, t.output, {}, 10), false);
   assert.equal(t.input.isRaw, true);
+});
+
+
+test('measures fragmented cell geometry and keeps existing input consumers isolated', async () => {
+  const t = terminal(input => {
+    for (const chunk of ['\x1b[6;', '18;9t', 'e4', '\x1b[?1c']) input.write(chunk);
+  });
+  let keyboard = '';
+  t.input.on('data', chunk => { keyboard += chunk; });
+  let ratio;
+  assert.equal(await detectGraphics('kitty', t.input, t.output, {}, 50, value => { ratio = value; }), true);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(ratio, 2);
+  assert.equal(keyboard, 'e4');
 });

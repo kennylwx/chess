@@ -36,17 +36,25 @@ test('fixed board updates do not reserve new lines or scroll the terminal', () =
   assert.match(output, /C=1,q=2/);
 });
 
-test('uses a bounded rectangle instead of assuming terminal cell geometry', () => {
+test('fits one aspect-preserving dimension using measured cell geometry', () => {
   const originalRows = process.stdout.rows;
   const originalColumns = process.stdout.columns;
   try {
-    for (const [width, height] of [[80, 40], [45, 20], [120, 50]]) {
+    for (const [width, height, ratio] of [[80, 40, 2], [45, 20, 2.2], [120, 50, 1.5], [40, 40, 2]]) {
       process.stdout.columns = width;
       process.stdout.rows = height;
-      const output = renderGraphics(new Chess(), 'w', null, true);
-      const placement = output.match(/c=(\d+),r=(\d+)/);
-      assert.equal(Number(placement[1]), width - 2);
-      assert.equal(Number(placement[2]), Math.min(32, height - 8));
+      const output = renderGraphics(new Chess(), 'w', null, true, ratio);
+      const command = output.match(/a=T[^;]+/)[0];
+      const columns = command.match(/,c=(\d+)/);
+      const rows = command.match(/,r=(\d+)/);
+      assert.notEqual(Boolean(columns), Boolean(rows));
+      if (columns) {
+        assert.equal(Number(columns[1]), width - 2);
+        assert.ok(Math.ceil(Number(columns[1]) / ratio) <= height - 8);
+      } else {
+        assert.equal(Number(rows[1]), Math.min(32, height - 8));
+        assert.ok(Number(rows[1]) * ratio <= width - 2);
+      }
       assert.ok(output.startsWith(clearGraphics()));
     }
   } finally {

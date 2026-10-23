@@ -11,17 +11,19 @@ export function supportsGraphics(mode: GraphicsMode, tty = Boolean(stdout.isTTY 
   return confirmed;
 }
 
-/** Probe before readline owns stdin. A query does not store or display an image. */
-export async function detectGraphics(mode: GraphicsMode, input = stdin, output = stdout, env = process.env, timeout = 300): Promise<boolean> {
+/** Isolate protocol replies from readline. Queries do not store or display images. */
+export async function detectGraphics(mode: GraphicsMode, input = stdin, output = stdout, env = process.env, timeout = 300, onCellAspect?: (ratio: number) => void): Promise<boolean> {
   const tty = Boolean(input.isTTY && output.isTTY);
-  if (mode !== 'auto' || !tty || env.TMUX || env.STY || env.TERM === 'dumb') {
+  if (mode === 'text' || !tty || env.TMUX || env.STY || env.TERM === 'dumb') {
     return supportsGraphics(mode, tty, env);
   }
+  const previous = input.listeners('data') as Array<(chunk: Buffer | string) => void>;
+  previous.forEach(listener => input.off('data', listener));
   const wasRaw = input.isRaw;
   const wasFlowing = input.readableFlowing === true;
   let pending = '';
   let keyboard = '';
-  let confirmed = false;
+  let confirmed = mode === 'kitty';
   return await new Promise<boolean>((resolve, reject) => {
     let finished = false;
     const finish = (error?: Error): void => {
@@ -33,7 +35,8 @@ export async function detectGraphics(mode: GraphicsMode, input = stdin, output =
       input.off('end', onEnd);
       input.off('error', onError);
       input.setRawMode(Boolean(wasRaw));
-      // Preserve keys typed during startup, but never replay terminal replies.
+      previous.forEach(listener => input.on('data', listener));
+      // Preserve keys typed during a probe, but never replay terminal replies.
       if (keyboard) input.unshift(Buffer.from(keyboard));
       if (wasFlowing) input.resume();
       if (error) reject(error); else resolve(confirmed);
@@ -50,8 +53,15 @@ export async function detectGraphics(mode: GraphicsMode, input = stdin, output =
         }
         const reply = pending.match(/^\x1b_G([^;]*);([^\x1b]*)\x1b\\/);
         if (reply) {
-          if (reply[1].split(',').includes(`i=${QUERY_ID}`)) confirmed = reply[2] === 'OK';
+          if (mode === 'auto' && reply[1].split(',').includes(`i=${QUERY_ID}`)) confirmed = reply[2] === 'OK';
           pending = pending.slice(reply[0].length);
+          continue;
+        }
+        const cellSize = pending.match(/^\x1b\[6;(\d+);(\d+)t/);
+        if (cellSize) {
+          const height = Number(cellSize[1]), width = Number(cellSize[2]);
+          if (height > 0 && width > 0 && height <= 1000 && width <= 1000) onCellAspect?.(height / width);
+          pending = pending.slice(cellSize[0].length);
           continue;
         }
         const attributes = pending.match(/^\x1b\[\?[\d;]*c/);
@@ -63,7 +73,7 @@ export async function detectGraphics(mode: GraphicsMode, input = stdin, output =
         }
         // Buffer fragmented responses, preserving unrelated escape keys.
         if ('\x1b_G'.startsWith(pending) || pending.startsWith('\x1b_G') ||
-            '\x1b[?'.startsWith(pending) || /^\x1b\[\?[\d;]*$/.test(pending)) break;
+            '\x1b[?'.startsWith(pending) || /^\x1b\[(?:\?[\d;]*|6[;\d]*)$/.test(pending)) break;
         keyboard += pending[0];
         pending = pending.slice(1);
       }
@@ -75,7 +85,7 @@ export async function detectGraphics(mode: GraphicsMode, input = stdin, output =
     try {
       input.setRawMode(true);
       input.resume();
-      output.write(`\x1b_Gi=${QUERY_ID},s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\\x1b[c`);
+      output.write(`\x1b_Gi=${QUERY_ID},s=1,v=1,a=q,t=d,f=24;AAAA\x1b\\\x1b[16t\x1b[c`);
     } catch (error) { finish(error as Error); }
   });
 }

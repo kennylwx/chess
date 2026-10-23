@@ -27,8 +27,12 @@ enable images. Unsupported terminals, redirected streams, tmux and screen use th
 text board. `--graphics text` skips probing; `--graphics kitty` explicitly forces
 the protocol on an interactive terminal (use only if you know it supports it).
 
-The board uses the terminal's aspect-preserving fit within the available rows and
-columns, rather than a font-specific cell ratio. Resizing redraws the board; help,
-returning to menus and exit delete the board image. If the native PNG renderer
-cannot load, play continues with the text board. A protocol response establishes
-capability, not visual correctness in every terminal/version.
+The CLI queries cell pixel dimensions at startup and on image-board resize, then
+specifies only one image dimension so the PNG stays square. If cell size is not
+reported, sizing uses an approximate 2:1 cell ratio; image aspect is still preserved,
+but available-space estimates can be less accurate with unusual fonts. The text
+board also uses approximate proportions and depends on the terminal font.
+
+Help, returning to menus and exit delete the board image. If the native PNG
+renderer cannot load, play continues with the text board. A protocol response
+establishes capability, not visual correctness in every terminal/version.

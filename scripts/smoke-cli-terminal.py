@@ -22,7 +22,7 @@ def scenario(graphics):
         try:
             until(b'\x1b[c')
             reply=b'\x1b_Gi=73192;OK\x1b\\' if graphics else b''
-            os.write(master, reply+b'\x1b[?1;2c')
+            os.write(master, reply+b'\x1b[6;18;9t\x1b[?1;2c')
             frame=until(b'Type any moves')
             assert (b'a=T' in frame)==graphics
             os.write(master,b'e4\r')
@@ -36,8 +36,11 @@ def scenario(graphics):
             until(b'Type any moves')
             fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack('HHHH', 25, 60, 0, 0))
             os.kill(child.pid,signal.SIGWINCH)
+            if graphics:
+                until(b'\x1b[c')
+                os.write(master, b'\x1b_Gi=73192;OK\x1b\\\x1b[6;18;9t\x1b[?1c')
             resized=until(b'\x1b[24;2H')
-            if graphics: assert b'c=58,r=17' in resized
+            if graphics: assert b',r=17,' in resized and b',c=' not in resized
             os.write(master,b'/quit\r')
             final=until(b'\x1b[?1049l')
             if graphics: assert b'a=d,d=I' in final
