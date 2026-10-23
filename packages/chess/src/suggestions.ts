@@ -1,6 +1,12 @@
 import { squareName, type Chess } from './index.js';
 
 const names: Record<string, string> = { king: 'K', queen: 'Q', rook: 'R', bishop: 'B', knight: 'N', pawn: 'P' };
+export function normalizeNotation(text: string): string {
+  const symbols: Record<string, string> = { '♔':'K', '♚':'K', '♕':'Q', '♛':'Q', '♖':'R', '♜':'R', '♗':'B', '♝':'B', '♘':'N', '♞':'N', '♙':'', '♟':'' };
+  return text.trim().replace(/[♔♚♕♛♖♜♗♝♘♞♙♟]/g, symbol => symbols[symbol])
+    .replace(/×/g, 'x').replace(/([a-h][1-8])\s*(?:→|->|-)\s*(?=[a-h][1-8])/g, '$1').replace(/0/g, 'O');
+}
+
 export const looksLikeNotation = (text: string): boolean => !/\s/.test(text) && (/\d/.test(text) || /^[O0]-[O0]/.test(text));
 
 function distance(a: string, b: string): number {
@@ -13,9 +19,9 @@ function distance(a: string, b: string): number {
   return row[b.length];
 }
 
-/** Rank only legal moves related to the requested piece, square or capture. */
+/** Prefer matching legal moves, then offer explicitly labeled legal alternatives. */
 export function suggestMoves(input: string, chess: Chess): string[] {
-  const text = input.trim();
+  const text = normalizeNotation(input);
   const lower = text.toLowerCase();
   const notation = looksLikeNotation(text);
   const squares = lower.match(/[a-h][1-8]/g) || [];
@@ -27,9 +33,8 @@ export function suggestMoves(input: string, chess: Chess): string[] {
     ? (/^[KQRBN]/.exec(text)?.[0] || (/^[a-h]/.test(text) ? 'P' : undefined)) : undefined;
   const capture = notation ? text.includes('x') : /\b(take|takes|taking|capture|captures|capturing)\b/.test(lower);
   const castle = /\bcastl/.test(lower) || /^[O0]-[O0]/.test(text);
-  if (!notation && !piece && !destination && !capture && !castle) return [];
   const legal = chess.moves();
-  return legal.map(move => {
+  const matches = legal.map(move => {
     const san = chess.san(move, legal);
     const from = squareName(move.from), to = squareName(move.to);
     const kind = chess.board[move.from]!.toUpperCase();
@@ -44,9 +49,10 @@ export function suggestMoves(input: string, chess: Chess): string[] {
     return { san, score: (to === destination ? 20 : 0) + (from === source ? 10 : 0) - difference };
   }).filter((entry): entry is { san: string; score: number } => entry !== null)
     .sort((a, b) => b.score - a.score || a.san.localeCompare(b.san)).slice(0, 5).map(entry => entry.san);
+  return matches.length ? matches : legal.map(move => chess.san(move, legal)).sort().slice(0, 5);
 }
 
 export function suggestionMessage(input: string, chess: Chess): string {
   const moves = suggestMoves(input, chess);
-  return moves.length ? `No exact match. Try: ${moves.join(' · ')}` : 'No matching legal move. Specify the piece and target square.';
+  return moves.length ? `No exact match. Try: ${moves.join(' · ')} (legal alternatives; confirm your intended move).` : 'No legal moves are available.';
 }

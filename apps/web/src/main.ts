@@ -234,7 +234,7 @@ async function submitCommand(raw: string): Promise<void> {
     if (version !== gameVersion) return;
     const text = error instanceof Error ? error.message : String(error);
     const pinned = illegalMoveReason(input, chess);
-    message(pinned || text, true, pinned ? [] : runSuggestions(input));
+    message(pinned || text, true, runSuggestions(input));
   } finally {
     if (version === gameVersion) { busy=false; phase=null; controller=undefined; render(); }
   }

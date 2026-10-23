@@ -2,7 +2,7 @@ import { squareName } from './index.js';
 import type { Chess } from './index.js';
 import { ResolutionError, type MoveResolver } from './resolution.js';
 import { illegalMoveReason } from './legality.js';
-import { looksLikeNotation, suggestionMessage } from './suggestions.js';
+import { looksLikeNotation, normalizeNotation, suggestionMessage } from './suggestions.js';
 
 export type InputIntent =
   | { type:'empty' }
@@ -28,7 +28,7 @@ export async function modelInput(raw:string, chess:Chess, server?:MoveResolver):
   if (lower.startsWith('/')) throw new Error(`Unknown command: ${text}. Type /help to see commands.`);
 
   const legal = chess.moves();
-  const normalized = text;
+  const normalized = normalizeNotation(text);
   const exact = legal.find(move => {
     const uci = squareName(move.from) + squareName(move.to) + (move.promotion || '');
     return uci === normalized || chess.san(move, legal) === normalized;
@@ -36,15 +36,17 @@ export async function modelInput(raw:string, chess:Chess, server?:MoveResolver):
   if (exact) return { type: 'move', value: squareName(exact.from) + squareName(exact.to) + (exact.promotion || ''), source: 'notation' };
 
   const reason = illegalMoveReason(text, chess);
-  if (reason) throw new Error(reason);
+  if (reason) throw new Error(`${reason} ${suggestionMessage(text, chess)}`);
   if (looksLikeNotation(text)) throw new Error(suggestionMessage(text, chess));
 
-  if (!server) throw new Error('Chess server is required for natural-language input');
+  if (!server) throw new Error(`Chess server is required for natural-language input. ${suggestionMessage(text, chess)}`);
   let result;
   try { result = await server.resolve(text, chess); }
   catch (error) {
     if (error instanceof ResolutionError && error.status === 422) throw new Error(suggestionMessage(text, chess));
-    throw error;
+    if (error instanceof Error && error.name === 'AbortError') throw error;
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`${detail}. ${suggestionMessage(text, chess)}`);
   }
   return { type: 'move', value: result.move, fen: result.fen, explanation: result.explanation, source: 'jev' };
 }
