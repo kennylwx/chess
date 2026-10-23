@@ -34,18 +34,20 @@ def scenario(graphics):
             assert (b'a=d,d=I' in help_frame)==graphics
             os.write(master,b'/back\r')
             until(b'Type any moves')
-            fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack('HHHH', 25, 60, 0, 0))
-            os.kill(child.pid,signal.SIGWINCH)
-            if graphics:
-                until(b'\x1b[c')
-                os.write(master, b'\x1b_Gi=73192;OK\x1b\\\x1b[6;18;9t\x1b[?1c')
-            resized=until(b'\x1b[24;2H')
-            if graphics: assert b',r=17,' in resized and b',c=' not in resized
+            for height, width in [(25, 60), (30, 70)]:
+                fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack('HHHH', height, width, 0, 0))
+                os.kill(child.pid,signal.SIGWINCH)
+                if graphics:
+                    until(b'\x1b[c')
+                    os.write(master, b'\x1b_Gi=73192;OK\x1b\\\x1b[6;18;9t\x1b[?1c')
+                resized=until(f'\x1b[{height - 1};2H'.encode())
+                if graphics:
+                    assert f',r={height - 8},'.encode() in resized and b',c=' not in resized
             os.write(master,b'/quit\r')
             final=until(b'\x1b[?1049l')
             if graphics: assert b'a=d,d=I' in final
             assert child.wait(timeout=5)==0
-            print(('graphics' if graphics else 'text fallback')+': move/reply, help/back, resize and exit passed')
+            print(('graphics' if graphics else 'text fallback')+': move/reply, help/back, two resizes and exit passed')
         finally:
             if child.poll() is None: child.kill();child.wait()
             os.close(master)

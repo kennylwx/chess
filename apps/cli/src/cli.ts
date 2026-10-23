@@ -295,8 +295,7 @@ async function playGame(config: GameConfig, options: { useGraphics: boolean; cel
         if (useGraphics) await detectGraphics('kitty', stdin, stdout, process.env, 300, ratio => { options.cellAspect = ratio; });
         if (!stopped) { draw(); redrawInput?.(); }
       } catch { /* Keep the previous geometry if the terminal stops responding. */ }
-      finally { resizeTask = undefined; }
-    })();
+    })().finally(() => { resizeTask = undefined; });
   };
   const question = async (placeholder: string): Promise<string> => {
     if (!screen.active) return await rl.question(`${promptColor}${placeholder} › ${reset}`, { signal: abort.signal });
