@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { PassThrough } from 'node:stream';
+import { StringDecoder } from 'node:string_decoder';
 import { detectGraphics, supportsGraphics } from '../dist/terminal.js';
 
 function terminal(reply, { tty = true, raw = false } = {}) {
@@ -125,22 +126,58 @@ test('preserves split UTF-8 keyboard input through startup and resize probes', a
   }
 });
 
-test('flushes an incomplete trailing UTF-8 character on timeout and probe completion', async () => {
+test('replays incomplete keyboard bytes unchanged on timeout and probe completion', async () => {
   for (const attributes of [false, true]) {
     const t = terminal(input => {
       const prefix = Buffer.from(attributes ? 'move\x1b[?1c' : 'move');
       input.write(Buffer.concat([prefix, Buffer.from([0xe2])]));
     });
     assert.equal(await detectGraphics('auto', t.input, t.output, {TERM: 'xterm-kitty'}, 20), false);
-    assert.equal(t.input.read().toString(), 'move\ufffd');
+    assert.deepEqual(t.input.read(), Buffer.concat([Buffer.from('move'), Buffer.from([0xe2])]));
     assert.equal(t.input.listenerCount('data'), 0);
   }
 });
 
-test('decoder flush does not replay an incomplete protocol response', async () => {
+test('handoff does not replay an incomplete protocol response', async () => {
   const t = terminal(input => {
     input.write(Buffer.concat([Buffer.from('e4\x1b_Gi=73192;'), Buffer.from([0xe2])]));
   });
   assert.equal(await detectGraphics('auto', t.input, t.output, {TERM: 'xterm-kitty'}, 20), false);
   assert.equal(t.input.read().toString(), 'e4');
+});
+
+
+test('downstream decoder completes keyboard UTF-8 across DA and timeout handoff', async () => {
+  for (const attributes of [true, false]) {
+    const t = terminal(input => {
+      input.write(Buffer.concat([Buffer.from(attributes ? '\x1b[?1c' : ''), Buffer.from([0xe2])]));
+    });
+    const downstream = new StringDecoder('utf8');
+    let text = '';
+    t.input.on('data', chunk => { text += downstream.write(chunk); });
+    await detectGraphics('auto', t.input, t.output, {TERM: 'xterm-kitty'}, 20);
+    await new Promise(resolve => setImmediate(resolve));
+    t.input.write(Buffer.from([0x99, 0x94]));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(text, '♔');
+    assert.equal(downstream.end(), '');
+  }
+});
+
+
+test('only actual EOF flushes truncated keyboard UTF-8 in the downstream decoder', async () => {
+  const t = terminal(input => input.write(Buffer.from([0xe2])));
+  const downstream = new StringDecoder('utf8');
+  let text = '';
+  t.input.on('data', chunk => { text += downstream.write(chunk); });
+  const ended = new Promise(resolve => t.input.once('end', () => {
+    text += downstream.end();
+    resolve();
+  }));
+  await detectGraphics('auto', t.input, t.output, {TERM: 'xterm-kitty'}, 20);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(text, '');
+  t.input.end();
+  await ended;
+  assert.equal(text, '\ufffd');
 });

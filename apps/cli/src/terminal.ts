@@ -1,5 +1,4 @@
 import { stdin, stdout } from 'node:process';
-import { StringDecoder } from 'node:string_decoder';
 
 export type GraphicsMode = 'auto' | 'kitty' | 'text' | 'ascii';
 const QUERY_ID = 73192;
@@ -35,7 +34,6 @@ export async function detectGraphics(mode: GraphicsMode, input = stdin, output =
   previous.forEach(listener => input.off('data', listener));
   const wasRaw = input.isRaw;
   const wasFlowing = input.readableFlowing === true;
-  const decoder = new StringDecoder('utf8');
   let pending = '';
   let keyboard = '';
   let confirmed = mode === 'kitty';
@@ -51,19 +49,19 @@ export async function detectGraphics(mode: GraphicsMode, input = stdin, output =
       input.off('error', onError);
       input.setRawMode(Boolean(wasRaw));
       previous.forEach(listener => input.on('data', listener));
-      // Flush an incomplete trailing keyboard character once when ownership
-      // returns to readline; never replay an unfinished protocol response.
-      const tail = decoder.end();
-      if (!pending) keyboard += tail;
-      // Preserve keys typed during a probe, but never replay terminal replies.
-      if (keyboard) input.unshift(Buffer.from(keyboard));
+      // Replay original bytes, including any partial UTF-8 character. The
+      // downstream decoder owns completion across this handoff and EOF.
+      if (keyboard) input.unshift(Buffer.from(keyboard, 'latin1'));
       if (wasFlowing) input.resume();
       if (error) reject(error); else resolve(confirmed);
     };
     const onEnd = (): void => finish();
     const onError = (error: Error): void => finish(error);
     const onData = (chunk: Buffer | string): void => {
-      pending += decoder.write(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+      // Latin-1 is a reversible byte mapping here, not a text encoding choice.
+      // Protocol delimiters are ASCII; decoding keyboard UTF-8 here would
+      // corrupt characters whose continuation arrives after the probe ends.
+      pending += (typeof chunk === 'string' ? Buffer.from(chunk) : chunk).toString('latin1');
       while (pending) {
         if (pending[0] !== '\x1b') {
           keyboard += pending[0];
