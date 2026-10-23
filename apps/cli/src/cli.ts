@@ -4,7 +4,8 @@ import { Chess, START_FEN } from '@zchess/chess';
 import { modelInput } from './input.js';
 import { ChessServerClient } from './api.js';
 import { render } from './ui.js';
-import { renderGraphics, supportsGraphics, type GraphicsMode } from './graphics.js';
+import { clearGraphics, renderGraphics, type GraphicsMode } from './graphics.js';
+import { detectGraphics } from './terminal.js';
 import { engineMove } from './engine.js';
 import { GameScreen, MenuScreen } from './screen.js';
 import { moveHistory, undoTurn } from './history.js';
@@ -66,6 +67,7 @@ export async function run(args: string[]): Promise<void> {
   if (!['auto', 'kitty', 'text'].includes(graphics)) throw new Error('Graphics must be auto, kitty, or text.');
   const depth = Number(get('--depth', '12'));
   if (!Number.isInteger(depth) || depth < 1 || depth > 30) throw new Error('Depth must be an integer from 1 to 30.');
+  const useGraphics = await detectGraphics(graphics);
   const store = new GameStore(get('--db', undefined));
   const direct = args.some(arg => arg.startsWith('--'));
   const interactiveMenu = !direct && stdin.isTTY && stdout.isTTY;
@@ -89,7 +91,7 @@ export async function run(args: string[]): Promise<void> {
         config = choice;
       }
       if (config) {
-        const again = await playGame(config, { graphics, depth, serverUrl: get('--server', process.env.ZCHESS_SERVER_URL || 'http://localhost:8000')!, store, sharedScreen: interactiveMenu });
+        const again = await playGame(config, { useGraphics, depth, serverUrl: get('--server', process.env.ZCHESS_SERVER_URL || 'http://localhost:8000')!, store, sharedScreen: interactiveMenu });
         if (again && config.saved) returnToSavedGames = true;
         if (direct || !again) keepGoing = false;
       }
@@ -235,7 +237,7 @@ function rawPrompt<T>(prompt: string, onKey: (text: string, key: Key, finish: (v
   });
 }
 
-async function playGame(config: GameConfig, options: { graphics: GraphicsMode; depth: number; serverUrl: string; store: GameStore; sharedScreen: boolean }): Promise<boolean> {
+async function playGame(config: GameConfig, options: { useGraphics: boolean; depth: number; serverUrl: string; store: GameStore; sharedScreen: boolean }): Promise<boolean> {
   const { elo, human, saved } = config;
   let startFen = saved?.startFen ?? config.fen ?? START_FEN;
   const chess = new Chess(startFen);
@@ -244,7 +246,7 @@ async function playGame(config: GameConfig, options: { graphics: GraphicsMode; d
   const server = new ChessServerClient(options.serverUrl, abort.signal);
   const rl = createInterface({ input: stdin, output: stdout });
   const screen = new GameScreen(Boolean(stdout.isTTY && stdin.isTTY), stdout, !options.sharedScreen);
-  const useGraphics = supportsGraphics(options.graphics);
+  let useGraphics = options.useGraphics;
   let stopped = false;
   let redrawInput: (() => void) | undefined;
   let last: number[] | null = null;
@@ -258,11 +260,21 @@ async function playGame(config: GameConfig, options: { graphics: GraphicsMode; d
   const persist = (): void => {
     gameId = options.store.save({ elo, color: human, startFen, fen: chess.fen(), moves: chess.history.map(entry => entry.san), status: chess.status() ?? 'In progress' }, gameId);
   };
-  const draw = (): void => screen.draw(header,
-    showingHelp ? commandHelp()
-      : useGraphics ? renderGraphics(chess, human, last, screen.active)
-        : render(chess, { perspective: human, last, compact: screen.active && (stdout.rows || 40) < 36 }),
-    notice, showingHelp ? '' : moveHistory(chess, Math.max(1, (stdout.columns || 80) - 1)));
+  const draw = (): void => {
+    let board: string;
+    if (showingHelp) board = (useGraphics ? clearGraphics() : '') + commandHelp();
+    else {
+      try { board = useGraphics ? renderGraphics(chess, human, last, screen.active) : ''; }
+      catch {
+        // A missing native rasterizer must not prevent playing a text game.
+        stdout.write(clearGraphics());
+        useGraphics = false;
+        board = '';
+      }
+      if (!useGraphics) board = render(chess, { perspective: human, last, compact: screen.active && (stdout.rows || 40) < 36 });
+    }
+    screen.draw(header, board, notice, showingHelp ? '' : moveHistory(chess, Math.max(1, (stdout.columns || 80) - 1)));
+  };
   const takeBack = (): void => {
     notice = undoTurn(chess, human) ? 'Took back your last move and any Stockfish reply.' : 'No move to undo yet.';
     const move = chess.history.at(-1)?.move;
@@ -392,6 +404,7 @@ async function playGame(config: GameConfig, options: { graphics: GraphicsMode; d
     process.off('SIGINT', stop);
     process.off('SIGTERM', stop);
     rl.close();
+    if (useGraphics) stdout.write(clearGraphics());
     screen.close();
   }
   return returnToMenu || screen.active && returnToMenuRequested;

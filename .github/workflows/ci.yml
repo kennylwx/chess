@@ -23,6 +23,7 @@ jobs:
           VERSION="$(node -p "require('./apps/cli/package.json').version")"
           npm install --prefix "$RUNNER_TEMP/zchess-cli-install" --no-audit --no-fund "$RUNNER_TEMP/zchess-pack/zchess-${VERSION}.tgz"
           node scripts/smoke-installed-cli.mjs "$RUNNER_TEMP/zchess-cli-install/node_modules/.bin/chess"
+          python3 scripts/smoke-cli-terminal.py "$RUNNER_TEMP/zchess-cli-install/node_modules/.bin/chess"
           node scripts/generate-homebrew-formula.mjs 0.0.0 https://registry.npmjs.org/zchess/-/zchess-0.0.0.tgz "$(printf '0%.0s' {1..64})" "$RUNNER_TEMP/zchess.rb"
           ruby -c "$RUNNER_TEMP/zchess.rb"
       - run: pnpm --filter @zchess/web exec playwright install --with-deps chromium

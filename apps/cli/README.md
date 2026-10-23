@@ -20,3 +20,15 @@ brew install --formula https://github.com/kennylwx/zchess/releases/latest/downlo
 
 Stockfish runs locally. Plain-English move descriptions need the Chess server;
 SAN and UCI moves work offline.
+
+Terminal graphics default to `--graphics auto`: the CLI probes the active terminal
+for Kitty graphics support before enabling images. Environment names alone do not
+enable images. Unsupported terminals, redirected streams, tmux and screen use the
+text board. `--graphics text` skips probing; `--graphics kitty` explicitly forces
+the protocol on an interactive terminal (use only if you know it supports it).
+
+The board uses the terminal's aspect-preserving fit within the available rows and
+columns, rather than a font-specific cell ratio. Resizing redraws the board; help,
+returning to menus and exit delete the board image. If the native PNG renderer
+cannot load, play continues with the text board. A protocol response establishes
+capability, not visual correctness in every terminal/version.

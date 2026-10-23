@@ -5,13 +5,10 @@ import piecesData from '@zchess/chess/pieces' with { type: 'json' };
 const require = createRequire(import.meta.url);
 const pieces = piecesData as Record<string, string>;
 const IMAGE_ID = 73191;
-export type GraphicsMode = 'auto' | 'kitty' | 'text';
+export { supportsGraphics, type GraphicsMode } from './terminal.js';
 
-export function supportsGraphics(mode: GraphicsMode, tty = Boolean(process.stdout.isTTY), env = process.env): boolean {
-  if (!tty || mode === 'text') return false;
-  if (mode === 'kitty') return true;
-  if (env.TMUX || env.STY) return false;
-  return env.TERM_PROGRAM === 'ghostty' || env.TERM === 'xterm-ghostty' || env.TERM === 'xterm-kitty';
+export function clearGraphics(): string {
+  return `\x1b_Ga=d,d=I,i=${IMAGE_ID},q=2;\x1b\\`;
 }
 
 export function boardSvg(chess: Chess, perspective: 'w' | 'b', last: number[] | null): string {
@@ -42,17 +39,13 @@ export function boardPng(chess: Chess, perspective: 'w' | 'b', last: number[] | 
 }
 
 export function renderGraphics(chess: Chess, perspective: 'w' | 'b', last: number[] | null, fixed = false): string {
-  // The supplied Ghostty screenshot shows that this terminal's cells are a
-  // little narrower than the usual 2:1 estimate. Use a 2.2:1 placement so the
-  // rendered board squares do not appear tall.
-  const columnsPerRow = 2.2;
-  const availableRows = Math.max(1, (process.stdout.rows || 40) - (fixed ? 8 : 7));
-  const availableColumns = Math.max(2, (process.stdout.columns || 80) - 2);
-  const rows = Math.max(1, Math.min(32, availableRows, Math.floor(availableColumns / columnsPerRow)));
-  const columns = Math.min(availableColumns, Math.round(rows * columnsPerRow));
+  // Let the terminal use its actual cell geometry to letterbox the square PNG.
+  // Kitty's c/r rectangle is a bounding box, not an assumed cell aspect ratio.
+  const rows = Math.max(1, Math.min(32, (process.stdout.rows || 40) - (fixed ? 8 : 7)));
+  const columns = Math.max(1, (process.stdout.columns || 80) - 2);
   const data = boardPng(chess, perspective, last).toString('base64');
   // Reserve room first: images anchored near the bottom must not cover the prompt.
-  let output = `\x1b_Ga=d,d=I,i=${IMAGE_ID},q=2;\x1b\\`;
+  let output = clearGraphics();
   if (!fixed) output += '\n'.repeat(rows) + `\x1b[${rows}A\r`;
   for (let offset = 0; offset < data.length; offset += 4096) {
     const chunk = data.slice(offset, offset + 4096);

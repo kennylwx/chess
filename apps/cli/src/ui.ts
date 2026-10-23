@@ -11,7 +11,9 @@ interface RenderOptions { perspective?: 'w' | 'b'; last?: number[] | null; color
 export function render(chess: Chess, { perspective = 'w', last = null, color = Boolean(process.stdout.isTTY), compact = false }: RenderOptions = {}): string {
   const rows = perspective === 'w' ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
   const files = perspective === 'w' ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
-  const cellWidth = Math.max(6, Math.min(8, Math.floor(((process.stdout.columns || 80) - 8) / 8)));
+  // Typical terminal cells are about twice as tall as they are wide. Keep
+  // compact ranks proportional too, and allow narrow windows to shrink.
+  const cellWidth = Math.max(1, Math.min(compact ? 2 : 6, Math.floor(((process.stdout.columns || 80) - 8) / 8)));
   const cell = (content = ''): string => {
     const left = Math.floor((cellWidth - 1) / 2);
     return `${' '.repeat(left)}${content}${' '.repeat(cellWidth - left - (content ? 1 : 0))}`;

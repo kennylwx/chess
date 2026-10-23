@@ -1,16 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { Chess } from '@zchess/chess';
-import { boardSvg, renderGraphics, supportsGraphics } from '../dist/graphics.js';
-
-test('enables images in Ghostty but keeps redirected output and unsupported terminals as text', () => {
-  assert.equal(supportsGraphics('auto', true, { TERM_PROGRAM: 'ghostty' }), true);
-  assert.equal(supportsGraphics('auto', false, { TERM_PROGRAM: 'ghostty' }), false);
-  assert.equal(supportsGraphics('auto', true, { TERM_PROGRAM: 'Apple_Terminal' }), false);
-  assert.equal(supportsGraphics('auto', true, { TERM_PROGRAM: 'ghostty', TMUX: 'session' }), false);
-  assert.equal(supportsGraphics('text', true, { TERM_PROGRAM: 'ghostty' }), false);
-  assert.equal(supportsGraphics('kitty', true, {}), true);
-});
+import { boardSvg, clearGraphics, renderGraphics } from '../dist/graphics.js';
 
 test('renders traditional pieces in the correct orientation and highlights moves', () => {
   const chess = new Chess();
@@ -45,11 +36,25 @@ test('fixed board updates do not reserve new lines or scroll the terminal', () =
   assert.match(output, /C=1,q=2/);
 });
 
-test('compensates for the terminal cell width so board squares render square', () => {
-  const output = renderGraphics(new Chess(), 'w', null);
-  const placement = output.match(/c=(\d+),r=(\d+)/);
-  assert.ok(placement);
-  const columns = Number(placement[1]);
-  const rows = Number(placement[2]);
-  assert.ok(columns / rows >= 2.1 && columns / rows <= 2.25);
+test('uses a bounded rectangle instead of assuming terminal cell geometry', () => {
+  const originalRows = process.stdout.rows;
+  const originalColumns = process.stdout.columns;
+  try {
+    for (const [width, height] of [[80, 40], [45, 20], [120, 50]]) {
+      process.stdout.columns = width;
+      process.stdout.rows = height;
+      const output = renderGraphics(new Chess(), 'w', null, true);
+      const placement = output.match(/c=(\d+),r=(\d+)/);
+      assert.equal(Number(placement[1]), width - 2);
+      assert.equal(Number(placement[2]), Math.min(32, height - 8));
+      assert.ok(output.startsWith(clearGraphics()));
+    }
+  } finally {
+    process.stdout.rows = originalRows;
+    process.stdout.columns = originalColumns;
+  }
+});
+
+test('cleanup deletes only the board image and frees its data without replies', () => {
+  assert.equal(clearGraphics(), '\x1b_Ga=d,d=I,i=73191,q=2;\x1b\\');
 });
