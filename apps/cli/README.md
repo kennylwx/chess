@@ -22,7 +22,10 @@ Stockfish runs locally. Plain-English move descriptions need the Chess server;
 SAN and UCI moves work offline.
 
 Terminal graphics default to `--graphics auto`: the CLI probes the active terminal
-for Kitty graphics support before enabling images. Environment names alone do not
+for Kitty graphics support only when identified as Kitty or Ghostty. Unknown
+emulators stay on text without receiving APC queries, because QTerminal 2.1.0
+was observed to leak query payloads into shell scrollback. A known identifier
+only permits probing; a successful runtime reply is still required. Names alone do not
 enable images. Unsupported terminals, redirected streams, tmux, screen and Konsole use the
 text board. `--graphics text` skips probing; `--graphics kitty` explicitly forces
 the protocol on an interactive terminal (use only if you know it supports it).

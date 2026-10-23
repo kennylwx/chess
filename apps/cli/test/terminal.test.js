@@ -17,7 +17,7 @@ function terminal(reply, { tty = true, raw = false } = {}) {
 }
 
 test('environment hints alone never prove automatic graphics support', () => {
-  for (const env of [{TERM: 'xterm-kitty'}, {TERM_PROGRAM: 'ghostty'}, {}]) {
+  for (const env of [{TERM: 'xterm-kitty'}, {TERM_PROGRAM: 'ghostty'}]) {
     assert.equal(supportsGraphics('auto', true, env), false);
     assert.equal(supportsGraphics('auto', true, env, true), true);
   }
@@ -31,7 +31,7 @@ test('accepts fragmented runtime confirmation, consumes replies and preserves ty
   const t = terminal(input => {
     for (const chunk of ['e', '\x1b_', 'Gi=73192;', 'OK\x1b', '\\', '\x1b[?', '1;2c', '4']) input.write(chunk);
   });
-  assert.equal(await detectGraphics('auto', t.input, t.output, {}, 50), true);
+  assert.equal(await detectGraphics('auto', t.input, t.output, {TERM: 'xterm-kitty'}, 50), true);
   assert.match(t.written(), /a=q/);
   assert.ok(!t.written().includes('a=T'));
   assert.equal(t.input.isRaw, false);
@@ -43,7 +43,7 @@ test('accepts fragmented runtime confirmation, consumes replies and preserves ty
 test('negative, absent and mismatched responses fall back to text', async () => {
   for (const response of ['\x1b[?1;2c', '\x1b_Gi=73192;ENOTSUP\x1b\\\x1b[?1c', '\x1b_Gi=99;OK\x1b\\\x1b[?1c', '']) {
     const t = terminal(input => input.write(response));
-    assert.equal(await detectGraphics('auto', t.input, t.output, {}, 10), false);
+    assert.equal(await detectGraphics('auto', t.input, t.output, {TERM: 'xterm-kitty'}, 10), false);
     assert.equal(t.input.isRaw, false);
     assert.equal(t.input.listenerCount('data'), 0);
     assert.equal(t.input.read(), null);
@@ -62,7 +62,7 @@ test('explicit kitty override survives missing replies and restores existing raw
   const t = terminal(null, {raw: true});
   assert.equal(await detectGraphics('kitty', t.input, t.output, {}, 10), true);
   assert.match(t.written(), /\x1b\[16t/);
-  assert.equal(await detectGraphics('auto', t.input, t.output, {}, 10), false);
+  assert.equal(await detectGraphics('auto', t.input, t.output, {TERM: 'xterm-kitty'}, 10), false);
   assert.equal(t.input.isRaw, true);
 });
 
@@ -89,5 +89,19 @@ test('Konsole auto stays text despite positive protocol capability; force remain
     assert.equal(t.written(), '');
     assert.equal(await detectGraphics('kitty', t.input, t.output, env, 50), true);
     assert.match(t.written(), /a=q/);
+  }
+});
+
+
+test('unknown terminal identifiers never receive APC probes or change input state', async () => {
+  for (const env of [{}, {TERM: 'xterm-256color'}, {TERM: 'xterm-256color', TERM_PROGRAM: 'qterminal'}]) {
+    const t = terminal(() => { throw new Error('Unsupported terminal must not be queried'); });
+    const paused = t.input.isPaused();
+    assert.equal(supportsGraphics('auto', true, env, true), false);
+    assert.equal(await detectGraphics('auto', t.input, t.output, env), false);
+    assert.equal(t.written(), '');
+    assert.equal(t.input.isRaw, false);
+    assert.equal(t.input.isPaused(), paused);
+    assert.equal(t.input.listenerCount('data'), 0);
   }
 });

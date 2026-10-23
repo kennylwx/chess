@@ -7,7 +7,11 @@ function blocksAutoGraphics(env: NodeJS.ProcessEnv): boolean {
   // Konsole 25.04.2 acknowledges Kitty queries but was observed to ignore our
   // single-dimension placement, clipping the board over the input field.
   // Keep auto conservative until its placement is empirically validated.
-  return Boolean(env.TMUX || env.STY || env.TERM === 'dumb' ||
+  const candidate = env.TERM === 'xterm-kitty' || env.TERM === 'xterm-ghostty' ||
+    ['kitty', 'ghostty'].includes(env.TERM_PROGRAM?.toLowerCase() ?? '');
+  // Unknown emulators can print APC payloads into shell scrollback (observed
+  // in QTerminal 2.1.0). A hint permits probing; only an OK reply enables images.
+  return Boolean(!candidate || env.TMUX || env.STY || env.TERM === 'dumb' ||
     env.KONSOLE_VERSION || env.TERM_PROGRAM?.toLowerCase() === 'konsole');
 }
 
