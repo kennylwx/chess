@@ -23,9 +23,13 @@ SAN and UCI moves work offline.
 
 Terminal graphics default to `--graphics auto`: the CLI probes the active terminal
 for Kitty graphics support before enabling images. Environment names alone do not
-enable images. Unsupported terminals, redirected streams, tmux and screen use the
+enable images. Unsupported terminals, redirected streams, tmux, screen and Konsole use the
 text board. `--graphics text` skips probing; `--graphics kitty` explicitly forces
 the protocol on an interactive terminal (use only if you know it supports it).
+
+Konsole defaults to text because testing in 25.04.2 found that it acknowledged
+Kitty queries but ignored the requested image sizing, clipping the board over
+the input field. Forced Kitty mode can still exhibit this issue in Konsole.
 
 The CLI queries cell pixel dimensions at startup and on image-board resize, then
 specifies only one image dimension so the PNG stays square. If cell size is not

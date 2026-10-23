@@ -79,3 +79,15 @@ test('measures fragmented cell geometry and keeps existing input consumers isola
   assert.equal(ratio, 2);
   assert.equal(keyboard, 'e4');
 });
+
+
+test('Konsole auto stays text despite positive protocol capability; force remains explicit', async () => {
+  for (const env of [{KONSOLE_VERSION: '250402'}, {TERM_PROGRAM: 'Konsole'}]) {
+    const t = terminal(input => input.write('\x1b_Gi=73192;OK\x1b\\\x1b[?1c'));
+    assert.equal(supportsGraphics('auto', true, env, true), false);
+    assert.equal(await detectGraphics('auto', t.input, t.output, env, 50), false);
+    assert.equal(t.written(), '');
+    assert.equal(await detectGraphics('kitty', t.input, t.output, env, 50), true);
+    assert.match(t.written(), /a=q/);
+  }
+});

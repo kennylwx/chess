@@ -1,12 +1,14 @@
 """Exercise protocol output in a PTY; this is not a visual terminal test."""
 import os, pty, subprocess, select, time, struct, fcntl, termios, signal, tempfile, sys
 CLI = sys.argv[1]
-def scenario(graphics):
+def scenario(graphics, konsole=False):
     master, slave = pty.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 40, 80, 0, 0))
     with tempfile.TemporaryDirectory() as directory:
         env = dict(os.environ, TERM='xterm-kitty')
         env.pop('TMUX', None); env.pop('STY', None)
+        env.pop('KONSOLE_VERSION', None); env.pop('TERM_PROGRAM', None)
+        if konsole: env['KONSOLE_VERSION'] = '250402'
         child = subprocess.Popen(['node', '--disable-warning=ExperimentalWarning', CLI, '--depth', '1', '--db', directory+'/games.sqlite'], stdin=slave, stdout=slave, stderr=slave, env=env)
         os.close(slave)
         output = b''
@@ -20,11 +22,13 @@ def scenario(graphics):
                     except OSError: raise AssertionError(('exit',child.poll(),output[-500:]))
             current=output; output=b''; return current
         try:
-            until(b'\x1b[c')
-            reply=b'\x1b_Gi=73192;OK\x1b\\' if graphics else b''
-            os.write(master, reply+b'\x1b[6;18;9t\x1b[?1;2c')
+            if not konsole:
+                until(b'\x1b[c')
+                reply=b'\x1b_Gi=73192;OK\x1b\\' if graphics else b''
+                os.write(master, reply+b'\x1b[6;18;9t\x1b[?1;2c')
             frame=until(b'Type any moves')
             assert (b'a=T' in frame)==graphics
+            if konsole: assert b'\x1b_G' not in frame
             os.write(master,b'e4\r')
             until(b'Black plays')
             # Finish the prompt frame before testing the next command.
@@ -47,9 +51,10 @@ def scenario(graphics):
             final=until(b'\x1b[?1049l')
             if graphics: assert b'a=d,d=I' in final
             assert child.wait(timeout=5)==0
-            print(('graphics' if graphics else 'text fallback')+': move/reply, help/back, two resizes and exit passed')
+            print(('Konsole fallback' if konsole else 'graphics' if graphics else 'text fallback')+': move/reply, help/back, two resizes and exit passed')
         finally:
             if child.poll() is None: child.kill();child.wait()
             os.close(master)
 scenario(True)
 scenario(False)
+scenario(False, konsole=True)

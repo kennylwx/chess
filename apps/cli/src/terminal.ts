@@ -3,18 +3,27 @@ import { stdin, stdout } from 'node:process';
 export type GraphicsMode = 'auto' | 'kitty' | 'text';
 const QUERY_ID = 73192;
 
+function blocksAutoGraphics(env: NodeJS.ProcessEnv): boolean {
+  // Konsole 25.04.2 acknowledges Kitty queries but was observed to ignore our
+  // single-dimension placement, clipping the board over the input field.
+  // Keep auto conservative until its placement is empirically validated.
+  return Boolean(env.TMUX || env.STY || env.TERM === 'dumb' ||
+    env.KONSOLE_VERSION || env.TERM_PROGRAM?.toLowerCase() === 'konsole');
+}
+
 /** Environment variables can disable probing, but cannot prove graphics support. */
 export function supportsGraphics(mode: GraphicsMode, tty = Boolean(stdout.isTTY && stdin.isTTY), env = process.env, confirmed = false): boolean {
   if (!tty || mode === 'text') return false;
   if (mode === 'kitty') return true;
-  if (env.TMUX || env.STY || env.TERM === 'dumb') return false;
+  if (blocksAutoGraphics(env)) return false;
   return confirmed;
 }
 
 /** Isolate protocol replies from readline. Queries do not store or display images. */
 export async function detectGraphics(mode: GraphicsMode, input = stdin, output = stdout, env = process.env, timeout = 300, onCellAspect?: (ratio: number) => void): Promise<boolean> {
   const tty = Boolean(input.isTTY && output.isTTY);
-  if (mode === 'text' || !tty || env.TMUX || env.STY || env.TERM === 'dumb') {
+  if (mode === 'text' || !tty || env.TMUX || env.STY || env.TERM === 'dumb' ||
+      (mode === 'auto' && blocksAutoGraphics(env))) {
     return supportsGraphics(mode, tty, env);
   }
   const previous = input.listeners('data') as Array<(chunk: Buffer | string) => void>;
