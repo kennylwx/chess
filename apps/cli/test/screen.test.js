@@ -32,9 +32,9 @@ test('keeps algebraic move history in the unfilled header above the board', () =
   assert.ok(output.indexOf('1. e4 e5') < output.indexOf('board frame'));
   assert.ok(output.includes('\r\n\r\nboard frame'));
   assert.ok(output.indexOf('board frame') < output.indexOf('White plays e4'));
-  assert.match(output, /38;2;224;242;215m/);
+  assert.match(output, /\x1b\[39m/);
   assert.match(output, /38;2;190;221;173m/);
-  assert.match(output, /38;2;224;242;215m/);
+  assert.match(output, /\x1b\[39m/);
   assert.ok(output.indexOf('\x1b[48;') > output.indexOf('board frame'));
 });
 
@@ -89,4 +89,26 @@ test('menu screens replace content in one alternate screen and restore the shell
   assert.match(output, /\/back · \/quit · Ctrl\+C quit/);
   assert.ok(!output.includes('\x1b[48;'));
   assert.ok(output.endsWith('\x1b[?25h\x1b[?1049l'));
+});
+
+
+test('default-background game and menu text follows the terminal foreground', () => {
+  let output = '';
+  const target = { columns: 80, rows: 40, write: text => { output += text; } };
+  const game = new GameScreen(true, target);
+  game.draw('HEADER', 'board', 'STATUS', 'HISTORY');
+  const chrome = output.slice(0, output.indexOf('\x1b[48;'));
+  assert.match(chrome, /\x1b\[39mHEADER/);
+  assert.match(chrome, /\x1b\[39mHISTORY/);
+  assert.match(chrome, /\x1b\[39m STATUS/);
+  assert.doesNotMatch(chrome, /\x1b\[38;(?:2|5);/);
+  // The dark input panel retains its explicit readable foreground colors.
+  assert.match(output, /48;2;12;42;34m/);
+  assert.match(output, /38;2;139;168;144m/);
+  game.input('e4');
+  assert.match(output, /38;2;235;248;226m/);
+  output = '';
+  new MenuScreen(true, target).draw('MENU', '1 Play', 'Choose');
+  assert.match(output, /\x1b\[39mMENU/);
+  assert.doesNotMatch(output, /\x1b\[38;(?:2|5);/);
 });

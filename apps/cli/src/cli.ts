@@ -46,7 +46,7 @@ export function editGameInput(value: string, text: string, key: Key): string {
   return value;
 }
 
-const promptColor = '\x1b[38;2;190;221;173m';
+const promptColor = '\x1b[39m';
 const reset = '\x1b[0m';
 const ELO_PRESETS = [
   { label: 'Beginner', elo: 1320 },

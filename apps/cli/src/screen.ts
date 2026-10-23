@@ -27,14 +27,14 @@ export class GameScreen {
     const width = Math.max(1, (this.output.columns || 80) - 1);
     const fit = (text: string): string => [...text.replace(/[\x00-\x1f\x7f]/g, ' ')].slice(0, width).join('');
     // Synchronized output prevents a visible blank frame between positions.
-    const title = `\x1b[38;2;224;242;215m${fit(header).padEnd(width)}\x1b[0m`;
-    const history = `\x1b[38;2;190;221;173m${fit(moves).padEnd(width)}\x1b[0m`;
+    const title = `\x1b[39m${fit(header).padEnd(width)}\x1b[0m`;
+    const history = `\x1b[39m${fit(moves).padEnd(width)}\x1b[0m`;
     const horizontalPadding = Math.min(1, Math.floor((width - 1) / 2));
     const innerWidth = Math.max(1, width - horizontalPadding * 2);
     const controls = '/help';
     const visibleControls = controls.slice(-Math.min(innerWidth, controls.length));
     const statusWidth = Math.max(0, innerWidth - visibleControls.length);
-    const footer = `\x1b[38;2;224;242;215m${' '.repeat(horizontalPadding)}${fit(status).slice(0, statusWidth).padEnd(statusWidth)}${visibleControls}${' '.repeat(horizontalPadding + 1)}\x1b[0m`;
+    const footer = `\x1b[39m${' '.repeat(horizontalPadding)}${fit(status).slice(0, statusWidth).padEnd(statusWidth)}${visibleControls}${' '.repeat(horizontalPadding + 1)}\x1b[0m`;
     const bottom = Math.max(6, this.output.rows || 40);
     this.output.write('\x1b[?2026h\x1b[H\x1b[2J' +
       `${title}\r\n${history}\r\n\r\n${board}\x1b[${bottom - 4};1H${footer}` +
@@ -98,9 +98,9 @@ export class MenuScreen {
       this.output.write(`${header}\n${content}\n${footer}\n`);
       return;
     }
-    const title = `\x1b[38;2;224;242;215m${fit(header).padEnd(width)}\x1b[0m`;
+    const title = `\x1b[39m${fit(header).padEnd(width)}\x1b[0m`;
     const horizontalPadding = Math.min(2, Math.floor((width - 1) / 2));
-    const status = `\x1b[38;2;210;225;202m${' '.repeat(horizontalPadding)}${fit(footer).slice(0, width - horizontalPadding * 2).padEnd(width - horizontalPadding * 2)}${' '.repeat(horizontalPadding)}\x1b[0m`;
+    const status = `\x1b[39m${' '.repeat(horizontalPadding)}${fit(footer).slice(0, width - horizontalPadding * 2).padEnd(width - horizontalPadding * 2)}${' '.repeat(horizontalPadding)}\x1b[0m`;
     const body = content.split('\n').map(line => fit(line)).join('\r\n');
     this.output.write(`\x1b[?25l\x1b[?2026h\x1b[H\x1b[2J${title}\r\n\r\n${body}\r\n\r\n${status}\r\n\x1b[?2026l`);
   }

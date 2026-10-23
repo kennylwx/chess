@@ -22,3 +22,13 @@ test('compact fallback reduces both dimensions and narrow boards do not wrap', (
     assert.ok(narrow.every(line => line.length <= 40));
   } finally { process.stdout.columns = columns; }
 });
+
+
+test('board labels use default foreground while colored squares retain piece contrast', () => {
+  const output = render(new Chess(), { color: true });
+  assert.ok(!output.includes('38;5;114m'));
+  assert.match(output, /\x1b\[39m   \+/);
+  assert.match(output, /\x1b\[39m    ♔ White    ♚ Black/);
+  assert.match(output, /48;5;\d+;38;5;231m/);
+  assert.match(output, /48;5;\d+;38;5;16m/);
+});

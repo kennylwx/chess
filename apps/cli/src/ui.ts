@@ -18,13 +18,13 @@ export function render(chess: Chess, { perspective = 'w', last = null, color = B
     const left = Math.floor((cellWidth - 1) / 2);
     return `${' '.repeat(left)}${content}${' '.repeat(cellWidth - left - (content ? 1 : 0))}`;
   };
-  const green = (text: string): string => color ? `\x1b[38;5;114m${text}${RESET}` : text;
-  const border = green(`   +${'-'.repeat(cellWidth * 8)}+`);
+  const defaultText = (text: string): string => color ? `\x1b[39m${text}${RESET}` : text;
+  const border = defaultText(`   +${'-'.repeat(cellWidth * 8)}+`);
   const output = [border];
 
   for (const rank of rows) {
     for (const line of compact ? [1] : [0, 1, 2]) {
-      let row = green(`${line === 1 ? ` ${8 - rank} ` : '   '}|`);
+      let row = defaultText(`${line === 1 ? ` ${8 - rank} ` : '   '}|`);
       for (const file of files) {
         const index = rank * 8 + file;
         const piece = chess.board[index];
@@ -39,13 +39,13 @@ export function render(chess: Chess, { perspective = 'w', last = null, color = B
         }
         row += square;
       }
-      output.push(row + green('|'));
+      output.push(row + defaultText('|'));
     }
   }
   output.push(border);
-  output.push(green('    ' + files.map(file => cell('abcdefgh'[file])).join('')));
+  output.push(defaultText('    ' + files.map(file => cell('abcdefgh'[file])).join('')));
   output.push(color
-    ? `    \x1b[1;38;5;231m♚ White${RESET}    ${green('♚ Black · dark pieces')}`
+    ? defaultText('    ♔ White    ♚ Black · dark pieces')
     : '    ♔ White    ♚ Black');
   return output.join('\n') + '\n';
 }
