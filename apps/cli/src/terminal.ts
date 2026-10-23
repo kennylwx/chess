@@ -1,4 +1,5 @@
 import { stdin, stdout } from 'node:process';
+import { StringDecoder } from 'node:string_decoder';
 
 export type GraphicsMode = 'auto' | 'kitty' | 'text' | 'ascii';
 const QUERY_ID = 73192;
@@ -34,6 +35,7 @@ export async function detectGraphics(mode: GraphicsMode, input = stdin, output =
   previous.forEach(listener => input.off('data', listener));
   const wasRaw = input.isRaw;
   const wasFlowing = input.readableFlowing === true;
+  const decoder = new StringDecoder('utf8');
   let pending = '';
   let keyboard = '';
   let confirmed = mode === 'kitty';
@@ -49,6 +51,10 @@ export async function detectGraphics(mode: GraphicsMode, input = stdin, output =
       input.off('error', onError);
       input.setRawMode(Boolean(wasRaw));
       previous.forEach(listener => input.on('data', listener));
+      // Flush an incomplete trailing keyboard character once when ownership
+      // returns to readline; never replay an unfinished protocol response.
+      const tail = decoder.end();
+      if (!pending) keyboard += tail;
       // Preserve keys typed during a probe, but never replay terminal replies.
       if (keyboard) input.unshift(Buffer.from(keyboard));
       if (wasFlowing) input.resume();
@@ -57,7 +63,7 @@ export async function detectGraphics(mode: GraphicsMode, input = stdin, output =
     const onEnd = (): void => finish();
     const onError = (error: Error): void => finish(error);
     const onData = (chunk: Buffer | string): void => {
-      pending += chunk.toString();
+      pending += decoder.write(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
       while (pending) {
         if (pending[0] !== '\x1b') {
           keyboard += pending[0];

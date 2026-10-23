@@ -105,3 +105,42 @@ test('unknown terminal identifiers never receive APC probes or change input stat
     assert.equal(t.input.listenerCount('data'), 0);
   }
 });
+
+test('preserves split UTF-8 keyboard input through startup and resize probes', async () => {
+  for (const flowing of [false, true]) {
+    const t = terminal(input => {
+      input.write(Buffer.from([0xe2]));
+      input.write(Buffer.from([0x99, 0x94]));
+      input.write(Buffer.from([0xf0, 0x9f]));
+      input.write(Buffer.from([0x98, 0x80]));
+      input.write('\x1b_Gi=73192;OK\x1b\\\x1b[?1c');
+    }, {raw: flowing});
+    let keyboard = '';
+    if (flowing) t.input.on('data', chunk => { keyboard += chunk.toString(); });
+    assert.equal(await detectGraphics('auto', t.input, t.output, {TERM: 'xterm-kitty'}, 50), true);
+    await new Promise(resolve => setImmediate(resolve));
+    if (!flowing) keyboard = t.input.read().toString();
+    assert.equal(keyboard, '♔😀');
+    assert.equal(t.input.isRaw, flowing);
+  }
+});
+
+test('flushes an incomplete trailing UTF-8 character on timeout and probe completion', async () => {
+  for (const attributes of [false, true]) {
+    const t = terminal(input => {
+      const prefix = Buffer.from(attributes ? 'move\x1b[?1c' : 'move');
+      input.write(Buffer.concat([prefix, Buffer.from([0xe2])]));
+    });
+    assert.equal(await detectGraphics('auto', t.input, t.output, {TERM: 'xterm-kitty'}, 20), false);
+    assert.equal(t.input.read().toString(), 'move\ufffd');
+    assert.equal(t.input.listenerCount('data'), 0);
+  }
+});
+
+test('decoder flush does not replay an incomplete protocol response', async () => {
+  const t = terminal(input => {
+    input.write(Buffer.concat([Buffer.from('e4\x1b_Gi=73192;'), Buffer.from([0xe2])]));
+  });
+  assert.equal(await detectGraphics('auto', t.input, t.output, {TERM: 'xterm-kitty'}, 20), false);
+  assert.equal(t.input.read().toString(), 'e4');
+});
