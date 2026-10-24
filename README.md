@@ -24,6 +24,13 @@ npm install --global zchess
 chess
 ```
 
+## Test
+
+Run `pnpm test` for the workspace suite; Turbo builds dependencies before tests.
+For a standalone chess package check, run `pnpm --filter @zchess/chess test:standalone`.
+The package’s `test` script uses existing build output so parallel CLI consumers
+never read files being rewritten by a test-time build.
+
 ## Release the CLI
 
 ```sh
